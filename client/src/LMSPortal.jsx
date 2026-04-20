@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from './api/axios';
 
 const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
     const [courses, setCourses] = useState([]);
@@ -63,14 +63,11 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
         const totalMarks = questions.reduce((acc, q) => acc + (q.marks || 1), 0);
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.post('http://localhost:4000/api/lms/quiz-results', {
+            await axios.post('/lms/quiz-results', {
                 quizId: quizPlay._id,
                 score,
                 totalMarks,
                 answers: results
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
             alert(`Quiz submitted! Your score: ${score} / ${totalMarks}`);
             setQuizPlay(null);
@@ -106,7 +103,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:4000/api/lms/upload', formData, {
+            const res = await axios.post('/lms/upload', formData, {
                 headers: { 
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
@@ -125,12 +122,12 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
         const token = localStorage.getItem('token');
         try {
             if (showAddModal === 'material') {
-                const res = await axios.post(`http://localhost:4000/api/lms/courses/${activeCourse._id}/modules/${targetModule}/materials`, modalData, {
+                const res = await axios.post(`/lms/courses/${activeCourse._id}/modules/${targetModule}/materials`, modalData, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setActiveCourse(res.data);
             } else if (showAddModal === 'assignment') {
-                const res = await axios.post('http://localhost:4000/api/lms/assignments', {
+                const res = await axios.post('/lms/assignments', {
                     ...modalData,
                     courseId: activeCourse._id,
                     moduleId: targetModule
@@ -139,7 +136,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                 });
                 setActiveCourse(res.data);
             } else if (showAddModal === 'quiz') {
-                const res = await axios.post('http://localhost:4000/api/lms/quizzes', {
+                const res = await axios.post('/lms/quizzes', {
                     ...modalData,
                     courseId: activeCourse._id,
                     moduleId: targetModule,
@@ -159,7 +156,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
         try {
             const token = localStorage.getItem('token');
             const instId = localStorage.getItem('viewingInstitutionId');
-            const res = await axios.get(`http://localhost:4000/api/lms/courses${instId ? `?institutionId=${instId}` : ''}`, {
+            const res = await axios.get(`/lms/courses${instId ? `?institutionId=${instId}` : ''}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setCourses(res.data);
@@ -173,7 +170,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
     const fetchCourseDetail = async (id) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:4000/api/lms/courses/${id}`, {
+            const res = await axios.get(`/lms/courses/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setActiveCourse(res.data);
@@ -195,7 +192,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.post('http://localhost:4000/api/lms/courses', data, {
+            await axios.post('/lms/courses', data, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setView('list');
@@ -214,7 +211,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`http://localhost:4000/api/lms/courses/${activeCourse._id}/modules/${moduleId}/materials`, { title, url, type }, {
+            await axios.post(`/lms/courses/${activeCourse._id}/modules/${moduleId}/materials`, { title, url, type }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchCourseDetail(activeCourse._id);
@@ -236,7 +233,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
     const fetchMySubmissions = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:4000/api/lms/my-submissions', {
+            const res = await axios.get('/lms/my-submissions', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setMySubmissions(res.data);
@@ -248,7 +245,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
     const fetchMyQuizResults = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:4000/api/lms/my-quiz-results', {
+            const res = await axios.get('/lms/my-quiz-results', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setMyQuizResults(res.data);
@@ -262,7 +259,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
         try {
             const token = localStorage.getItem('token');
             const instId = localStorage.getItem('viewingInstitutionId');
-            const res = await axios.get(`http://localhost:4000/api/lms/institution-students${instId ? `?institutionId=${instId}` : ''}`, {
+            const res = await axios.get(`/lms/institution-students${instId ? `?institutionId=${instId}` : ''}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setInstitutionStudents(res.data);
@@ -278,7 +275,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post(`http://localhost:4000/api/lms/courses/${activeCourse._id}/modules`, { title, week }, {
+            const res = await axios.post(`/lms/courses/${activeCourse._id}/modules`, { title, week }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setActiveCourse(res.data);
@@ -296,7 +293,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:4000/api/lms/assignments', {
+            const res = await axios.post('/lms/assignments', {
                 courseId: activeCourse._id,
                 moduleId,
                 title,
@@ -318,7 +315,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:4000/api/lms/quizzes', {
+            const res = await axios.post('/lms/quizzes', {
                 courseId: activeCourse._id,
                 moduleId,
                 title,
@@ -353,7 +350,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
             const currentQuiz = activeCourse.modules.flatMap(m => m.quizzes).find(q => q._id === quizId);
             const updatedQuestions = [...currentQuiz.questions, { questionText, options, correctOption }];
             
-            await axios.put(`http://localhost:4000/api/lms/quizzes/${quizId}`, { questions: updatedQuestions }, {
+            await axios.put(`/lms/quizzes/${quizId}`, { questions: updatedQuestions }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             
@@ -368,7 +365,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
     const enrollStudent = async (studentId) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post(`http://localhost:4000/api/lms/courses/${activeCourse._id}/enroll`, { studentId }, {
+            const res = await axios.post(`/lms/courses/${activeCourse._id}/enroll`, { studentId }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setActiveCourse(res.data);
@@ -382,7 +379,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
     const fetchSubmissions = async (assignmentId) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:4000/api/lms/assignments/${assignmentId}/submissions`, {
+            const res = await axios.get(`/lms/assignments/${assignmentId}/submissions`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setSubmissions(res.data);
@@ -397,7 +394,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
         e.preventDefault();
         try {
             const token = localStorage.getItem('token');
-            await axios.post('http://localhost:4000/api/lms/submissions', {
+            await axios.post('/lms/submissions', {
                 assignmentId: targetModule, // reuse targetModule for assignmentId in this context
                 content: modalData.content,
                 fileUrl: modalData.url || modalData.attachmentUrl
@@ -415,7 +412,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
         e.preventDefault();
         try {
             const token = localStorage.getItem('token');
-            await axios.put(`http://localhost:4000/api/lms/submissions/${gradingSubmission._id}`, {
+            await axios.put(`/lms/submissions/${gradingSubmission._id}`, {
                 grade: modalData.grade,
                 feedback: modalData.feedback,
                 status: 'graded'
@@ -448,7 +445,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
     const fetchQuizResults = async (quizId) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:4000/api/lms/quizzes/${quizId}/results`, {
+            const res = await axios.get(`/lms/quizzes/${quizId}/results`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setQuizResults(res.data);

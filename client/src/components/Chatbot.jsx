@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import axios from '../api/axios';
 
 const Chatbot = ({ isHidden, user }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -30,16 +30,13 @@ const Chatbot = ({ isHidden, user }) => {
         setIsTyping(true);
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:4000/api/chatbot', { 
+            const res = await axios.post('/chatbot', { 
                 message: input,
                 context: {
                     user: user?.name,
                     role: user?.role,
                     batch: user?.batch
                 }
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
 
             setMessages(prev => [...prev, { role: 'assistant', content: res.data.reply }]);

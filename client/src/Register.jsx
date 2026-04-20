@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from './api/axios';
 
 const Register = ({ onBack }) => {
     const [formData, setFormData] = useState({
@@ -18,7 +18,7 @@ const Register = ({ onBack }) => {
     useEffect(() => {
         const fetchInstitutions = async () => {
             try {
-                const res = await axios.get('http://localhost:4000/api/auth/institutions-public');
+                const res = await axios.get('/auth/institutions-public');
                 setInstitutions(res.data);
                 if (res.data.length > 0) {
                     setFormData(prev => ({ ...prev, institutionId: res.data[0]._id }));
@@ -41,7 +41,7 @@ const Register = ({ onBack }) => {
         setLoading(true);
 
         try {
-            await axios.post('http://localhost:4000/api/auth/register', formData);
+            await axios.post('/auth/register', formData);
             setSuccess('Registration successful! You can now log in.');
             setTimeout(() => {
                 onBack();

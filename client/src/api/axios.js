@@ -2,7 +2,9 @@ import axios from 'axios';
 
 // Create an Axios instance with a base URL
 const api = axios.create({
-    baseURL: window.location.hostname === 'localhost' ? 'http://localhost:4000/api' : `http://${window.location.hostname}:4000/api`,
+    baseURL: window.location.hostname === 'localhost' 
+        ? 'http://localhost:4000/api' 
+        : 'https://campuscore-5thv.onrender.com/api',
     headers: {
         'Content-Type': 'application/json',
     },
