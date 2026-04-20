@@ -1,0 +1,8 @@
+
+> timetable-server@1.0.0 start
+> node index.js
+
+[dotenv@17.2.4] injecting env (3) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+Server running on port 4000
+[36mMongoDB Config: Atlas/Custom[0m
+[32mMongoDB Connected: ac-fsnhage-shard-00-02.jhkwfq1.mongodb.net[0m
