@@ -10,4 +10,8 @@ const BatchSchema = new mongoose.Schema({
   session: String
 });
 
-module.exports = mongoose.model('Batch', BatchSchema);
+const getBatchModel = (connection) => {
+  return connection.models.Batch || connection.model('Batch', BatchSchema);
+};
+
+module.exports = { BatchSchema, getBatchModel };

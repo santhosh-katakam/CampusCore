@@ -15,4 +15,8 @@ const TimetableSchema = new mongoose.Schema({
   batch: String
 });
 
-module.exports = mongoose.model('Timetable', TimetableSchema);
+const getTimetableModel = (connection) => {
+  return connection.models.Timetable || connection.model('Timetable', TimetableSchema);
+};
+
+module.exports = { TimetableSchema, getTimetableModel };

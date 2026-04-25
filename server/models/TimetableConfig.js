@@ -20,4 +20,8 @@ const TimetableConfigSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('TimetableConfig', TimetableConfigSchema);
+const getTimetableConfigModel = (connection) => {
+    return connection.models.TimetableConfig || connection.model('TimetableConfig', TimetableConfigSchema);
+};
+
+module.exports = { TimetableConfigSchema, getTimetableConfigModel };

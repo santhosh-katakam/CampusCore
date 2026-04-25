@@ -13,4 +13,8 @@ const JobSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Job', JobSchema);
+const getJobModel = (connection) => {
+    return connection.models.Job || connection.model('Job', JobSchema);
+};
+
+module.exports = { JobSchema, getJobModel };

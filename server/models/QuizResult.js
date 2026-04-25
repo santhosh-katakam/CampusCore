@@ -9,4 +9,8 @@ const QuizResultSchema = new mongoose.Schema({
     completedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('QuizResult', QuizResultSchema);
+const getQuizResultModel = (connection) => {
+    return connection.models.QuizResult || connection.model('QuizResult', QuizResultSchema);
+};
+
+module.exports = { QuizResultSchema, getQuizResultModel };

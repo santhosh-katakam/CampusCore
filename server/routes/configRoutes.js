@@ -1,14 +1,29 @@
 const express = require('express');
 const router = express.Router();
-const TimetableConfig = require('../models/TimetableConfig');
+const mongoose = require('mongoose');
+const { getTimetableConfigModel } = require('../models/TimetableConfig');
+
+// Helper: Resolve dynamic model
+const getConfigModel = (req) => {
+    // Use tenant connection if available, else fallback to main connection
+    return req.tenantModels?.TimetableConfig || getTimetableConfigModel(mongoose.connection);
+};
 
 // Middleware to extract institutionId
-const getInstitutionId = (req) => req.headers['x-institution-id'] || process.env.DEFAULT_INSTITUTION_ID;
+const getInstitutionId = (req) => {
+    if (req.user && req.user.institutionId) return req.user.institutionId;
+    let id = req.headers['x-institution-id'];
+    if (!id || id === 'null' || id === 'undefined' || id === '') {
+        return process.env.DEFAULT_INSTITUTION_ID;
+    }
+    return id;
+};
 
 // GET Configuration by Session
 router.get('/config/:session', async (req, res) => {
     try {
         const institutionId = getInstitutionId(req);
+        const TimetableConfig = getConfigModel(req);
         const config = await TimetableConfig.findOne({ session: req.params.session, institutionId });
         if (!config) {
             // Return default config if not found
@@ -24,6 +39,7 @@ router.get('/config/:session', async (req, res) => {
         }
         res.json(config);
     } catch (err) {
+        console.error('FETCH CONFIG ERROR:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -32,6 +48,7 @@ router.get('/config/:session', async (req, res) => {
 router.put('/config/:session', async (req, res) => {
     try {
         const institutionId = getInstitutionId(req);
+        const TimetableConfig = getConfigModel(req);
         const { periodsPerDay, periodDuration, startTime, endTime, workingDays, lunchBreak } = req.body;
 
         let config = await TimetableConfig.findOne({ session: req.params.session, institutionId });
@@ -44,6 +61,7 @@ router.put('/config/:session', async (req, res) => {
             config.endTime = endTime;
             config.workingDays = workingDays;
             config.lunchBreak = lunchBreak;
+            config.updatedAt = new Date();
             await config.save();
         } else {
             // Create new
@@ -62,8 +80,10 @@ router.put('/config/:session', async (req, res) => {
 
         res.json(config);
     } catch (err) {
+        console.error('SAVE CONFIG ERROR:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
 module.exports = router;
+

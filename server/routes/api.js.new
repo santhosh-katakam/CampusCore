@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const router = express.Router();
 const TimetableConfig = require('../models/TimetableConfig');
 const Scheduler = require('../utils/scheduler');
@@ -70,7 +69,6 @@ const PERIOD_LABELS = {
 // ── User Management (Institutional) ──────────────────────────────────
 router.get('/users', async (req, res) => {
   try {
-    const { User } = getModels(req);
     const users = await User.find(getInstFilter(req)).select('-password');
     res.json(users);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -78,7 +76,6 @@ router.get('/users', async (req, res) => {
 
 router.post('/users', async (req, res) => {
   try {
-    const { User } = getModels(req);
     const institutionId = getInstitutionId(req);
     const { username, password, role, name, email, batch, department } = req.body;
     
@@ -106,7 +103,6 @@ router.post('/users', async (req, res) => {
 
 router.put('/users/:id', async (req, res) => {
   try {
-    const { User } = getModels(req);
     const institutionId = getInstitutionId(req);
     const { username, role, name, email, batch, department } = req.body;
     const updateData = { username, role, name, email, batch, department };
@@ -140,7 +136,6 @@ router.put('/users/:id', async (req, res) => {
 
 router.delete('/users/:id', async (req, res) => {
   try {
-    const { User } = getModels(req);
     const institutionId = getInstitutionId(req);
     const user = await User.findOneAndDelete({ _id: req.params.id, institutionId });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -209,7 +204,7 @@ function distinct(entries, key) {
 router.get('/batches', async (req, res) => {
   try {
     const { Batch } = getModels(req);
-    const batches = await Batch.find(getInstFilter(req));
+    const batches = const { Batch } = getModels(req); await Batch.find(getInstFilter(req));
 
     // Helper: derive year label from semester number
     const semToYear = (sem) => {
@@ -251,7 +246,7 @@ router.put('/batches/:id', async (req, res) => {
   try {
     const { Batch } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const batch = await Batch.findOneAndUpdate({ _id: req.params.id, institutionId }, req.body, { new: true });
+    const batch = const { Batch } = getModels(req); await Batch.findOneAndUpdate({ _id: req.params.id, institutionId }, req.body, { new: true });
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
     res.json(batch);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -261,7 +256,7 @@ router.delete('/batches/:id', async (req, res) => {
   try {
     const { Batch } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const batch = await Batch.findOneAndDelete({ _id: req.params.id, institutionId });
+    const batch = const { Batch } = getModels(req); await Batch.findOneAndDelete({ _id: req.params.id, institutionId });
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
     res.json({ message: 'Batch deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -281,7 +276,7 @@ router.post('/batches/bulk-delete', async (req, res) => {
 router.get('/faculty', async (req, res) => {
   try {
     const { Faculty } = getModels(req);
-    const faculty = await Faculty.find(getInstFilter(req));
+    const faculty = const { Faculty } = getModels(req); await Faculty.find(getInstFilter(req));
     res.json(faculty);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -300,7 +295,7 @@ router.put('/faculty/:id', async (req, res) => {
   try {
     const { Faculty } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const faculty = await Faculty.findOneAndUpdate({ _id: req.params.id, institutionId }, req.body, { new: true });
+    const faculty = const { Faculty } = getModels(req); await Faculty.findOneAndUpdate({ _id: req.params.id, institutionId }, req.body, { new: true });
     if (!faculty) return res.status(404).json({ error: 'Faculty not found' });
     res.json(faculty);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -310,7 +305,7 @@ router.delete('/faculty/:id', async (req, res) => {
   try {
     const { Faculty } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const faculty = await Faculty.findOneAndDelete({ _id: req.params.id, institutionId });
+    const faculty = const { Faculty } = getModels(req); await Faculty.findOneAndDelete({ _id: req.params.id, institutionId });
     if (!faculty) return res.status(404).json({ error: 'Faculty not found' });
     res.json({ message: 'Faculty deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -330,7 +325,7 @@ router.post('/faculty/bulk-delete', async (req, res) => {
 router.get('/rooms', async (req, res) => {
   try {
     const { Room } = getModels(req);
-    const rooms = await Room.find(getInstFilter(req));
+    const rooms = const { Room } = getModels(req); await Room.find(getInstFilter(req));
     res.json(rooms);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -349,7 +344,7 @@ router.put('/rooms/:id', async (req, res) => {
   try {
     const { Room } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const room = await Room.findOneAndUpdate({ _id: req.params.id, institutionId }, req.body, { new: true });
+    const room = const { Room } = getModels(req); await Room.findOneAndUpdate({ _id: req.params.id, institutionId }, req.body, { new: true });
     if (!room) return res.status(404).json({ error: 'Room not found' });
     res.json(room);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -359,7 +354,7 @@ router.delete('/rooms/:id', async (req, res) => {
   try {
     const { Room } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const room = await Room.findOneAndDelete({ _id: req.params.id, institutionId });
+    const room = const { Room } = getModels(req); await Room.findOneAndDelete({ _id: req.params.id, institutionId });
     if (!room) return res.status(404).json({ error: 'Room not found' });
     res.json({ message: 'Room deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -379,7 +374,7 @@ router.post('/rooms/bulk-delete', async (req, res) => {
 router.get('/subjects', async (req, res) => {
   try {
     const { Subject } = getModels(req);
-    const subjects = await Subject.find(getInstFilter(req));
+    const subjects = const { Subject } = getModels(req); await Subject.find(getInstFilter(req));
     res.json(subjects);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -417,7 +412,7 @@ router.get('/courses', async (req, res) => {
   try {
     const { Course } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const courses = await Course.find({ institutionId });
+    const courses = const { Course } = getModels(req); await Course.find({ institutionId });
     res.json(courses);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -436,7 +431,7 @@ router.put('/courses/:id', async (req, res) => {
   try {
     const { Course } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const course = await Course.findOneAndUpdate({ _id: req.params.id, institutionId }, req.body, { new: true });
+    const course = const { Course } = getModels(req); await Course.findOneAndUpdate({ _id: req.params.id, institutionId }, req.body, { new: true });
     if (!course) return res.status(404).json({ error: 'Course not found' });
     res.json(course);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -446,7 +441,7 @@ router.delete('/courses/:id', async (req, res) => {
   try {
     const { Course } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const course = await Course.findOneAndDelete({ _id: req.params.id, institutionId });
+    const course = const { Course } = getModels(req); await Course.findOneAndDelete({ _id: req.params.id, institutionId });
     if (!course) return res.status(404).json({ error: 'Course not found' });
     res.json({ message: 'Course deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -469,7 +464,7 @@ router.post('/courses/bulk-delete', async (req, res) => {
 router.get('/timetables', async (req, res) => {
   try {
     const { Timetable } = getModels(req);
-    const items = await Timetable.find(getInstFilter(req)).sort({ createdAt: -1 }).limit(200);
+    const items = const { Timetable } = getModels(req); await Timetable.find(getInstFilter(req)).sort({ createdAt: -1 }).limit(200);
     res.json(items);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -478,7 +473,7 @@ router.get('/timetables/:id', async (req, res) => {
   try {
     const { Timetable } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const item = await Timetable.findOne({ _id: req.params.id, institutionId });
+    const item = const { Timetable } = getModels(req); await Timetable.findOne({ _id: req.params.id, institutionId });
     if (!item) return res.status(404).json({ error: 'Not found' });
     res.json(item);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -488,20 +483,71 @@ router.delete('/timetables/:id', async (req, res) => {
   try {
     const { Timetable } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const result = await Timetable.findOneAndDelete({ _id: req.params.id, institutionId });
+    const result = const { Timetable } = getModels(req); await Timetable.findOneAndDelete({ _id: req.params.id, institutionId });
     if (!result) return res.status(404).json({ error: 'Timetable not found' });
     res.json({ message: 'Timetable deleted successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-
-router.put('/timetables/:id', async (req, res) => {
+router.get('/timetables/conflicts/:day/:period', async (req, res) => {
   try {
     const { Timetable } = getModels(req);
     const institutionId = getInstitutionId(req);
+    const { day, period } = req.params;
+    const periodNum = parseInt(period);
+
+    const timetables = const { Timetable } = getModels(req); await Timetable.find({ institutionId });
+    // ... rest of logic
+
+    const occupiedFaculty = new Set();
+    const occupiedRooms = new Set();
+    const facultyBusyMap = {};
+
+    timetables.forEach(tt => {
+      const daySchedule = tt.schedule.find(d => d.day === day);
+      if (!daySchedule) return;
+
+      daySchedule.periods.forEach(p => {
+        if (p.type === 'Free' || p.type === 'Lunch') return;
+
+        const populateFac = (fac) => {
+          if (!facultyBusyMap[fac]) facultyBusyMap[fac] = [];
+          facultyBusyMap[fac].push(p.period);
+        };
+
+        if (Array.isArray(p.electiveAllocations)) {
+          p.electiveAllocations.forEach(alloc => {
+            if (alloc.faculty && alloc.faculty !== 'Multiple') populateFac(alloc.faculty);
+            if (p.period === periodNum) {
+              if (alloc.faculty) occupiedFaculty.add(alloc.faculty);
+              if (alloc.room) occupiedRooms.add(alloc.room);
+            }
+          });
+        } else {
+          if (p.faculty && p.faculty !== 'Multiple') populateFac(p.faculty);
+          if (p.period === periodNum) {
+            if (p.faculty && p.faculty !== 'Multiple') occupiedFaculty.add(p.faculty);
+            if (p.room && p.room !== 'Multiple') occupiedRooms.add(p.room);
+          }
+        }
+      });
+    });
+
+    res.json({
+      occupiedFaculty: Array.from(occupiedFaculty),
+      occupiedRooms: Array.from(occupiedRooms),
+      facultyBusyMap
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/timetables/:id', async (req, res) => {
+  try {
+    const institutionId = getInstitutionId(req);
     const { schedule } = req.body;
-    const result = await Timetable.findOneAndUpdate(
+    const result = const { Timetable } = getModels(req); await Timetable.findOneAndUpdate(
       { _id: req.params.id, institutionId },
       { schedule },
       { new: true }
@@ -528,7 +574,7 @@ router.post('/generate', async (req, res) => {
       return res.status(400).json({ error: 'Batch selection required' });
     }
 
-    const batches = await Batch.find({ _id: { $in: targetBatchIds }, institutionId });
+    const batches = const { Batch } = getModels(req); await Batch.find({ _id: { $in: targetBatchIds }, institutionId });
     if (batches.length === 0) return res.status(404).json({ error: 'Batches not found' });
 
     let config = null;
@@ -541,7 +587,7 @@ router.post('/generate', async (req, res) => {
       labRooms: (selectedRooms?.labRooms?.length > 0) ? selectedRooms.labRooms : ['Lab']
     };
 
-    const existingTimetables = await Timetable.find({
+    const existingTimetables = const { Timetable } = getModels(req); await Timetable.find({
       institutionId,
       batchId: { $nin: targetBatchIds }
     });
@@ -613,12 +659,11 @@ router.post('/generate', async (req, res) => {
 // Stats preview (without generating)
 router.post('/stats/preview', async (req, res) => {
   try {
-    const { Batch, TimetableConfig } = getModels(req);
     const { batchId, subjectConfig } = req.body;
     let totalSlots = 35;
 
     if (batchId) {
-      const batch = await Batch.findById(batchId);
+      const batch = const { Batch } = getModels(req); await Batch.findById(batchId);
       if (batch && batch.session) {
         try {
           const config = await TimetableConfig.findOne({ session: batch.session });
@@ -690,15 +735,14 @@ router.post('/stats/preview', async (req, res) => {
 // ── 1. Faculty Wise Report ───────────────────────────────────────────
 router.get('/reports/faculty', async (req, res) => {
   try {
-    const { Timetable, Faculty } = getModels(req);
     const institutionId = getInstitutionId(req);
     const { facultyNames } = req.query;
     const names = Array.isArray(facultyNames)
       ? facultyNames
       : (facultyNames ? facultyNames.split(',').map(s => s.trim()).filter(Boolean) : []);
 
-    const timetables = await Timetable.find({ institutionId });
-    const allFaculty = await Faculty.find({ institutionId });
+    const timetables = const { Timetable } = getModels(req); await Timetable.find({ institutionId });
+    const allFaculty = const { Faculty } = getModels(req); await Faculty.find({ institutionId });
     const entries = flattenTimetables(timetables);
 
     const targetNames = names.length > 0 ? names : allFaculty.map(f => f.name);
@@ -730,15 +774,14 @@ router.get('/reports/faculty', async (req, res) => {
 // ── 2. Room Wise Report ──────────────────────────────────────────────
 router.get('/reports/room', async (req, res) => {
   try {
-    const { Timetable, Room } = getModels(req);
     const institutionId = getInstitutionId(req);
     const { roomNames } = req.query;
     const names = Array.isArray(roomNames)
       ? roomNames
       : (roomNames ? roomNames.split(',').map(s => s.trim()).filter(Boolean) : []);
 
-    const timetables = await Timetable.find({ institutionId });
-    const allRooms = await Room.find({ institutionId });
+    const timetables = const { Timetable } = getModels(req); await Timetable.find({ institutionId });
+    const allRooms = const { Room } = getModels(req); await Room.find({ institutionId });
     const entries = flattenTimetables(timetables);
 
     const targetNames = names.length > 0 ? names : allRooms.map(r => r.name);
@@ -781,11 +824,10 @@ router.get('/reports/room', async (req, res) => {
 // ── 3. Course Wise Report ────────────────────────────────────────────
 router.get('/reports/course', async (req, res) => {
   try {
-    const { Timetable } = getModels(req);
     const institutionId = getInstitutionId(req);
     const { courseName } = req.query;
 
-    const timetables = await Timetable.find({ institutionId });
+    const timetables = const { Timetable } = getModels(req); await Timetable.find({ institutionId });
     const entries = flattenTimetables(timetables);
 
     if (!courseName) {
@@ -815,10 +857,9 @@ router.get('/reports/course', async (req, res) => {
 // ── 4. Batch Wise Report ─────────────────────────────────────────────
 router.get('/reports/batch', async (req, res) => {
   try {
-    const { Timetable } = getModels(req);
     const institutionId = getInstitutionId(req);
     const { batchId } = req.query;
-    const timetables = await Timetable.find({ institutionId });
+    const timetables = const { Timetable } = getModels(req); await Timetable.find({ institutionId });
 
     if (!batchId) {
       const summaries = timetables.map(tt => {
@@ -888,7 +929,7 @@ router.get('/reports/batch', async (req, res) => {
 router.get('/reports/batch/:batchId', async (req, res) => {
   try {
     const institutionId = getInstitutionId(req);
-    const tt = await Timetable.findOne({
+    const tt = const { Timetable } = getModels(req); await Timetable.findOne({
       institutionId,
       $or: [{ batchId: req.params.batchId }, { batch: req.params.batchId }]
     });
@@ -900,15 +941,14 @@ router.get('/reports/batch/:batchId', async (req, res) => {
 // ── 5. Week & Time Slot Analysis ─────────────────────────────────────
 router.get('/analysis/slots', async (req, res) => {
   try {
-    const { Timetable, Faculty, Room } = getModels(req);
     const institutionId = getInstitutionId(req);
     const { day, periods } = req.query;
     const periodNums = periods ? periods.split(',').map(Number).filter(n => !isNaN(n)) : [1, 2, 3, 4, 5, 6, 7, 8];
     const targetDay = day || 'Monday';
 
-    const timetables = await Timetable.find({ institutionId });
-    const allFaculty = await Faculty.find({ institutionId });
-    const allRooms = await Room.find({ institutionId });
+    const timetables = const { Timetable } = getModels(req); await Timetable.find({ institutionId });
+    const allFaculty = const { Faculty } = getModels(req); await Faculty.find({ institutionId });
+    const allRooms = const { Room } = getModels(req); await Room.find({ institutionId });
     const entries = flattenTimetables(timetables);
 
     const result = periodNums.map(pNum => {
@@ -934,10 +974,9 @@ router.get('/analysis/slots', async (req, res) => {
 // ── 6. Room Utilization Analytics ────────────────────────────────────
 router.get('/analytics/room-utilization', async (req, res) => {
   try {
-    const { Timetable, Room, TimetableConfig } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const timetables = await Timetable.find({ institutionId });
-    const allRooms = await Room.find({ institutionId });
+    const timetables = const { Timetable } = getModels(req); await Timetable.find({ institutionId });
+    const allRooms = const { Room } = getModels(req); await Room.find({ institutionId });
     const config = await TimetableConfig.findOne({ institutionId });
 
     const daysCount = config?.workingDays?.length || 5;
@@ -972,9 +1011,8 @@ router.get('/analytics/room-utilization', async (req, res) => {
 // ── 7. Course Load Distribution (L-T-P) ──────────────────────────────
 router.get('/analytics/course-load', async (req, res) => {
   try {
-    const { Course } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const courses = await Course.find({ institutionId });
+    const courses = const { Course } = getModels(req); await Course.find({ institutionId });
 
     const grouped = {};
     courses.forEach(c => {
@@ -1009,9 +1047,8 @@ router.get('/analytics/course-load', async (req, res) => {
 // ── 8. Distinct courses list (for dropdowns) ─────────────────────────
 router.get('/reports/courses-list', async (req, res) => {
   try {
-    const { Course } = getModels(req);
     const institutionId = getInstitutionId(req);
-    const courses = await Course.find({ institutionId }, { subject: 1, courseCode: 1, department: 1 });
+    const courses = const { Course } = getModels(req); await Course.find({ institutionId }, { subject: 1, courseCode: 1, department: 1 });
     const distinct = [...new Map(courses.map(c => [c.subject, c])).values()]
       .map(c => ({ name: c.subject, code: c.courseCode, dept: c.department }))
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -1022,14 +1059,13 @@ router.get('/reports/courses-list', async (req, res) => {
 // ── 9. Faculty Availability Heat-Map ─────────────────────────────────
 router.get('/faculty-info/availability', async (req, res) => {
   try {
-    const { Faculty, Room, Timetable } = getModels(req);
     const institutionId = getInstitutionId(req);
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     const periods = [1, 2, 3, 4, 5, 6, 7, 8];
 
-    const allFaculty = await Faculty.find({ institutionId });
-    const allRooms = await Room.find({ institutionId });
-    const timetables = await Timetable.find({ institutionId });
+    const allFaculty = const { Faculty } = getModels(req); await Faculty.find({ institutionId });
+    const allRooms = const { Room } = getModels(req); await Room.find({ institutionId });
+    const timetables = const { Timetable } = getModels(req); await Timetable.find({ institutionId });
     const entries = flattenTimetables(timetables);
 
     const availability = days.map(day => {
@@ -1061,11 +1097,10 @@ router.get('/faculty-info/availability', async (req, res) => {
 // ── 10. Conflict Checker ──────────────────────────────────────────────
 router.get('/timetables/conflicts/:day/:period', async (req, res) => {
   try {
-    const { Timetable } = getModels(req);
     const institutionId = getInstitutionId(req);
     const { day, period } = req.params;
     const periodNum = parseInt(period);
-    const timetables = await Timetable.find({ institutionId });
+    const timetables = const { Timetable } = getModels(req); await Timetable.find({ institutionId });
     const entries = flattenTimetables(timetables);
 
     const slotEntries = entries.filter(e => e.day === day && e.period === periodNum);

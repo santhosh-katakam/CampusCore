@@ -29,4 +29,8 @@ const LMSCourseSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('LMSCourse', LMSCourseSchema);
+const getLMSCourseModel = (connection) => {
+    return connection.models.LMSCourse || connection.model('LMSCourse', LMSCourseSchema);
+};
+
+module.exports = { LMSCourseSchema, getLMSCourseModel };

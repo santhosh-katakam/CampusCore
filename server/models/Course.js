@@ -23,4 +23,8 @@ const CourseSchema = new mongoose.Schema({
     session: { type: String, required: true } // 2025-26-Even, etc.
 });
 
-module.exports = mongoose.model('Course', CourseSchema);
+const getCourseModel = (connection) => {
+    return connection.models.Course || connection.model('Course', CourseSchema);
+};
+
+module.exports = { CourseSchema, getCourseModel };

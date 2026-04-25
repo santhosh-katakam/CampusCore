@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Institution = require('../models/Institution');
-const User = require('../models/User');
-const Batch = require('../models/Batch');
-const Faculty = require('../models/Faculty');
-const Student = require('../models/Timetable'); // Actually Student data might be in Timetables or separate, checking models...
+const { getUserModel } = require('../models/User');
+const { getTenantModels } = require('../utils/tenantManager');
+
+// Helper: Resolve dynamic User model on main connection
+const MainUser = getUserModel(mongoose.connection);
 
 // Middleware to verify Company Admin
 const companyAdminOnly = (req, res, next) => {
@@ -18,12 +20,13 @@ const companyAdminOnly = (req, res, next) => {
 // @route   GET api/company/institutions
 // @desc    Get all institutions with their admin details
 router.get('/institutions', async (req, res) => {
+    console.log(`🏢 FETCHING INSTITUTIONS: User=${req.user?.username || 'Guest'}`);
     try {
         const institutions = await Institution.find().lean();
+        console.log(`✅ FOUND ${institutions.length} INSTITUTIONS`);
         
-        // Fetch admin users for each institution
         const enrichedInstitutions = await Promise.all(institutions.map(async (inst) => {
-            const admin = await User.findOne({ 
+            const admin = await MainUser.findOne({ 
                 institutionId: inst._id, 
                 role: 'COLLEGE_ADMIN' 
             }, 'username');
@@ -42,14 +45,17 @@ router.get('/institutions', async (req, res) => {
 // @route   POST api/company/institutions
 // @desc    Create an institution and its admin user
 router.post('/institutions', async (req, res) => {
-    const { name, code, address, contact, adminUsername, adminPassword } = req.body;
+    const { name, code, address, contact, adminUsername, adminPassword, slug: providedSlug } = req.body;
     try {
-        // 1. Create Institution
-        const institution = new Institution({ name, code, address, contact });
+        // 1. Generate slug if not provided
+        const slug = providedSlug || name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        
+        // 2. Create Institution
+        const institution = new Institution({ name, code, slug, address, contact });
         await institution.save();
 
-        // 2. Create College Admin User
-        const user = new User({
+        // 3. Create College Admin User (Stored in Main DB for cross-tenant routing)
+        const user = new MainUser({
             username: adminUsername,
             password: adminPassword,
             role: 'COLLEGE_ADMIN',
@@ -64,47 +70,37 @@ router.post('/institutions', async (req, res) => {
     }
 });
 
-// @route   PUT api/company/institutions/:id/reset-password
-// @desc    Reset a college admin's password
-router.put('/institutions/:id/reset-password', async (req, res) => {
-    const { newPassword } = req.body;
-    try {
-        const user = await User.findOne({ institutionId: req.params.id, role: 'COLLEGE_ADMIN' });
-        if (!user) return res.status(404).json({ error: 'Admin user not found' });
-
-        user.password = newPassword; // Pre-save hook will hash it
-        await user.save();
-        res.json({ message: 'Password updated successfully' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// @route   DELETE api/company/institutions/:id
-// @desc    Delete institution and its user (careful!)
-router.delete('/institutions/:id', async (req, res) => {
-    try {
-        await User.deleteMany({ institutionId: req.params.id });
-        await Institution.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Institution and associated users deleted' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // @route   GET api/company/stats
-// @desc    Get global stats for company dashboard
+// @desc    Get global stats for company dashboard (aggregated across all tenant DBs)
 router.get('/stats', async (req, res) => {
+    console.log(`📊 FETCHING GLOBAL STATS`);
     try {
-        const institutionCount = await Institution.countDocuments();
-        const facultyCount = await Faculty.countDocuments();
-        const batchCount = await Batch.countDocuments();
-        // Since Student model isn't explicitly found, maybe count something else or skip
-        
+        const institutions = await Institution.find();
+        let totalFaculty = 0;
+        let totalBatches = 0;
+
+        // Iterate through all institutions and sum up counts from their respective DBs
+        for (const inst of institutions) {
+            try {
+                if (!inst.slug) continue;
+                const models = await getTenantModels(inst.slug);
+                
+                const [facCount, batCount] = await Promise.all([
+                    models.Faculty.countDocuments(),
+                    models.Batch.countDocuments()
+                ]);
+                
+                totalFaculty += facCount;
+                totalBatches += batCount;
+            } catch (instErr) {
+                console.error(`Error fetching stats for ${inst.name}:`, instErr.message);
+            }
+        }
+
         res.json({
-            institutions: institutionCount,
-            totalFaculty: facultyCount,
-            totalBatches: batchCount
+            institutions: institutions.length,
+            totalFaculty,
+            totalBatches
         });
     } catch (err) {
         res.status(500).json({ error: err.message });

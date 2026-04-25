@@ -362,19 +362,153 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
         }
     };
 
-    const enrollStudent = async (studentId) => {
+    const deleteMaterial = async (moduleId, materialId) => {
+        if (!window.confirm('Are you sure you want to delete this material?')) return;
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post(`/lms/courses/${activeCourse._id}/enroll`, { studentId }, {
+            const res = await axios.delete(`/lms/courses/${activeCourse._id}/modules/${moduleId}/materials/${materialId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setActiveCourse(res.data);
-            alert("Student enrolled successfully!");
+        } catch (err) {
+            alert('Error deleting material: ' + err.message);
+        }
+    };
+
+    const deleteAssignment = async (assignmentId) => {
+        if (!window.confirm('Are you sure you want to delete this assignment?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`/lms/assignments/${assignmentId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchCourseDetail(activeCourse._id);
+        } catch (err) {
+            alert('Error deleting assignment: ' + err.message);
+        }
+    };
+
+    const deleteQuiz = async (quizId) => {
+        if (!window.confirm('Are you sure you want to delete this quiz?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`/lms/quizzes/${quizId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchCourseDetail(activeCourse._id);
+        } catch (err) {
+            alert('Error deleting quiz: ' + err.message);
+        }
+    };
+
+    const deleteModule = async (moduleId) => {
+        if (!window.confirm('Are you sure you want to delete this entire module and all its content?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.delete(`/lms/courses/${activeCourse._id}/modules/${moduleId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setActiveCourse(res.data);
+        } catch (err) {
+            alert('Error deleting module: ' + err.message);
+        }
+    };
+
+    const unenrollStudent = async (studentId) => {
+        if (!window.confirm('Remove this student from the course?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.delete(`/lms/courses/${activeCourse._id}/enroll/${studentId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setActiveCourse(res.data);
+        } catch (err) {
+            alert('Error unenrolling: ' + err.message);
+        }
+    };
+
+    const handleEditModule = async (mod) => {
+        const title = prompt("New Module Title:", mod.title);
+        const week = prompt("New Week Number:", mod.week);
+        if (!title || !week) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.put(`/lms/courses/${activeCourse._id}/modules/${mod._id}`, { title, week }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setActiveCourse(res.data);
+        } catch (err) {
+            alert('Error updating module: ' + err.message);
+        }
+    };
+
+    const handleEditMaterial = async (modId, mat) => {
+        const title = prompt("New Title:", mat.title);
+        const url = prompt("New URL:", mat.url);
+        if (!title || !url) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.put(`/lms/courses/${activeCourse._id}/modules/${modId}/materials/${mat._id}`, { title, url }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setActiveCourse(res.data);
+        } catch (err) {
+            alert('Error updating material: ' + err.message);
+        }
+    };
+
+    const handleEditAssignment = async (asn) => {
+        const title = prompt("New Title:", asn.title);
+        const description = prompt("New Description:", asn.description);
+        const dueDate = prompt("New Due Date (YYYY-MM-DD):", asn.dueDate?.split('T')[0]);
+        if (!title || !dueDate) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`/lms/assignments/${asn._id}`, { title, description, dueDate }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchCourseDetail(activeCourse._id);
+        } catch (err) {
+            alert('Error updating assignment: ' + err.message);
+        }
+    };
+
+    const handleEditQuiz = async (quiz) => {
+        const title = prompt("New Quiz Title:", quiz.title);
+        if (!title) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`/lms/quizzes/${quiz._id}`, { title }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchCourseDetail(activeCourse._id);
+        } catch (err) {
+            alert('Error updating quiz: ' + err.message);
+        }
+    };
+
+    const enrollStudent = async (studentId, courseId = null) => {
+        const targetId = courseId || activeCourse?._id;
+        if (!targetId) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`/lms/courses/${targetId}/enroll`, { studentId }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (activeCourse?._id === targetId) {
+                setActiveCourse(res.data);
+            }
+            fetchCourses(); // Refresh list to show enrolled status
+            alert("Successfully enrolled in course!");
         } catch (err) {
             alert('Enrollment failed: ' + (err.response?.data?.message || err.message));
         }
     };
-
 
     const fetchSubmissions = async (assignmentId) => {
         try {
@@ -395,13 +529,14 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
         try {
             const token = localStorage.getItem('token');
             await axios.post('/lms/submissions', {
-                assignmentId: targetModule, // reuse targetModule for assignmentId in this context
+                assignmentId: targetModule,
                 content: modalData.content,
                 fileUrl: modalData.url || modalData.attachmentUrl
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             alert('Assignment submitted successfully!');
+            fetchMySubmissions(); // Update student view
             closeModal();
         } catch (err) {
             alert('Submission failed: ' + err.message);
@@ -422,6 +557,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
             alert('Grade saved!');
             fetchSubmissions(activeAssignment);
             setGradingSubmission(null);
+            setShowAddModal(null);
         } catch (err) {
             alert('Grading failed: ' + err.message);
         }
@@ -483,21 +619,47 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
 
             {view === 'list' && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-                    {courses.map(course => (
-                        <div 
-                            key={course._id} 
-                            onClick={() => { fetchCourseDetail(course._id); setView('detail'); }}
-                            style={{ background: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', cursor: 'pointer', border: '1px solid #e2e8f0', transition: '0.2s' }}
-                        >
-                            <div style={{ color: '#4c51bf', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}>{course.category || 'General'}</div>
-                            <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#1a202c' }}>{course.title}</h3>
-                            <p style={{ color: '#718096', fontSize: '14px', marginBottom: '15px', height: '40px', overflow: 'hidden' }}>{course.description}</p>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#a0aec0' }}>
-                                <span>Faculty: {course.facultyId?.name}</span>
-                                <span>{course.modules?.length || 0} Modules</span>
+                    {courses.map(course => {
+                        const isEnrolled = course.students?.some(s => s._id === user.id);
+                        return (
+                            <div 
+                                key={course._id} 
+                                onClick={() => { fetchCourseDetail(course._id); setView('detail'); }}
+                                style={{ background: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', cursor: 'pointer', border: '1px solid #e2e8f0', transition: '0.2s', position: 'relative' }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                    <div style={{ color: '#4c51bf', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}>{course.category || 'General'}</div>
+                                    {viewingAs === 'student' && (
+                                        <span style={{ 
+                                            background: isEnrolled ? '#def7ec' : '#fef3c7', 
+                                            color: isEnrolled ? '#03543f' : '#92400e', 
+                                            padding: '2px 8px', 
+                                            borderRadius: '10px', 
+                                            fontSize: '10px', 
+                                            fontWeight: 'bold' 
+                                        }}>
+                                            {isEnrolled ? '✓ Enrolled' : 'Not Enrolled'}
+                                        </span>
+                                    )}
+                                </div>
+                                <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#1a202c' }}>{course.title}</h3>
+                                <p style={{ color: '#718096', fontSize: '14px', marginBottom: '15px', height: '40px', overflow: 'hidden' }}>{course.description}</p>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#a0aec0' }}>
+                                    <span>Faculty: {course.facultyId?.name}</span>
+                                    {viewingAs === 'student' && !isEnrolled ? (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); enrollStudent(user.id, course._id); }}
+                                            style={{ background: '#4c51bf', color: 'white', border: 'none', padding: '5px 12px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+                                        >
+                                            Enroll Now
+                                        </button>
+                                    ) : (
+                                        <span>{course.modules?.length || 0} Modules</span>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                     {courses.length === 0 && (
                         <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '100px', background: 'white', borderRadius: '24px', border: '2px dashed #e2e8f0', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
                             <div style={{ fontSize: '64px', marginBottom: '20px' }}>{viewingAs === 'student' ? '🎓' : '📚'}</div>
@@ -579,8 +741,24 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                     </div>
 
                     {/* Main Content Area */}
-                    <div style={{ background: 'white', padding: '30px', borderRadius: '15px', border: '1px solid #e2e8f0', minHeight: '600px' }}>
-                        <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #edf2f7', marginBottom: '30px' }}>
+                    <div style={{ background: 'white', padding: '30px', borderRadius: '15px', border: '1px solid #e2e8f0', minHeight: '600px', position: 'relative' }}>
+                        {viewingAs === 'student' && !activeCourse.students?.some(s => s._id === user.id) ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', padding: '40px' }}>
+                                <div style={{ fontSize: '64px', marginBottom: '20px' }}>🔒</div>
+                                <h3 style={{ fontSize: '24px', color: '#2d3748', marginBottom: '10px' }}>Enrollment Required</h3>
+                                <p style={{ color: '#718096', maxWidth: '400px', marginBottom: '30px' }}>
+                                    Content for this course is restricted. Please enroll to access modules, materials, assignments, and quizzes.
+                                </p>
+                                <button 
+                                    onClick={() => enrollStudent(user.id)}
+                                    style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '15px 40px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '18px', cursor: 'pointer', boxShadow: '0 8px 15px rgba(102, 126, 234, 0.4)' }}
+                                >
+                                    Enroll in Course
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #edf2f7', marginBottom: '30px' }}>
                             {['Content', 'Assignments', 'Quizzes', ...(viewingAs !== 'student' ? ['Students'] : []), ...(gradingSubmission || activeAssignment ? ['Submissions'] : []), ...(activeQuizId ? ['Quiz Results'] : [])].map(tab => (
                                 <div 
                                     key={tab}
@@ -628,7 +806,15 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                         {activeCourse.modules.map((mod, idx) => (
                                             <div key={idx} style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                                                    <h4 style={{ margin: 0 }}>Week {mod.week}: {mod.title}</h4>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <h4 style={{ margin: 0 }}>Week {mod.week}: {mod.title}</h4>
+                                                        {(viewingAs === 'hod' || viewingAs === 'faculty') && (
+                                                            <div style={{ display: 'flex', gap: '5px' }}>
+                                                                <button onClick={() => handleEditModule(mod)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }} title="Edit Module">✏️</button>
+                                                                <button onClick={() => deleteModule(mod._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }} title="Delete Module">🗑️</button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     {(viewingAs === 'hod' || viewingAs === 'faculty') && (
                                                         <div style={{ display: 'flex', gap: '10px' }}>
                                                             <button 
@@ -652,14 +838,79 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                    {/* Materials */}
                                                     {mod.materials?.map((mat, midx) => (
-                                                        <a key={midx} href={mat.url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: '#4a5568', padding: '10px', background: 'white', borderRadius: '8px', border: '1px solid #edf2f7' }}>
-                                                            <span>{mat.type === 'video' ? '🎥' : (mat.type === 'pdf' ? '📄' : '🔗')}</span>
-                                                            <span style={{ fontSize: '14px' }}>{mat.title}</span>
-                                                        </a>
+                                                        <div key={`mat-${midx}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: 'white', borderRadius: '10px', border: '1px solid #edf2f7', transition: '0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                                                            <a href={mat.url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: '#4a5568', flex: 1 }}>
+                                                                <span style={{ fontSize: '20px' }}>{mat.type === 'video' ? '🎥' : (mat.type === 'pdf' ? '📄' : '🔗')}</span>
+                                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#2d3748' }}>{mat.title}</span>
+                                                                    <span style={{ fontSize: '11px', color: '#a0aec0', textTransform: 'capitalize' }}>{mat.type} Material</span>
+                                                                </div>
+                                                            </a>
+                                                            {(viewingAs === 'hod' || viewingAs === 'faculty') && (
+                                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                                    <button onClick={() => handleEditMaterial(mod._id, mat)} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6 }}>✏️</button>
+                                                                    <button onClick={() => deleteMaterial(mod._id, mat._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6 }}>🗑️</button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     ))}
-                                                    {mod.materials?.length === 0 && <p style={{ fontSize: '13px', color: '#a0aec0', margin: 0 }}>No materials uploaded yet.</p>}
+
+                                                    {/* Assignments */}
+                                                    {mod.assignments?.map((asn, aidx) => (
+                                                        <div 
+                                                            key={`asn-${aidx}`}
+                                                            style={{ display: 'flex', alignItems: 'center', gap: '15px', color: '#2d3748', padding: '12px', background: '#fffaf0', borderRadius: '10px', border: '1px solid #feebc8', cursor: 'pointer', transition: '0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                                                        >
+                                                            <div onClick={() => setSubTab('assignments')} style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1 }}>
+                                                                <span style={{ fontSize: '20px' }}>📝</span>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                                                    <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#c05621' }}>{asn.title}</span>
+                                                                    <span style={{ fontSize: '11px', color: '#dd6b20' }}>Assignment • Due: {new Date(asn.dueDate).toLocaleDateString()}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                                                {(viewingAs === 'hod' || viewingAs === 'faculty') && (
+                                                                    <>
+                                                                        <button onClick={() => handleEditAssignment(asn)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>✏️</button>
+                                                                        <button onClick={() => deleteAssignment(asn._id)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>🗑️</button>
+                                                                    </>
+                                                                )}
+                                                                <div onClick={() => setSubTab('assignments')} style={{ background: '#feebc8', color: '#c05621', padding: '4px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: 'bold' }}>VIEW</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    {/* Quizzes */}
+                                                    {mod.quizzes?.map((quiz, qidx) => (
+                                                        <div 
+                                                            key={`quiz-${qidx}`}
+                                                            style={{ display: 'flex', alignItems: 'center', gap: '15px', color: '#2d3748', padding: '12px', background: '#ebf8ff', borderRadius: '10px', border: '1px solid #bee3f8', cursor: 'pointer', transition: '0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}
+                                                        >
+                                                            <div onClick={() => setSubTab('quizzes')} style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1 }}>
+                                                                <span style={{ fontSize: '20px' }}>🧠</span>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                                                    <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#2b6cb0' }}>{quiz.title}</span>
+                                                                    <span style={{ fontSize: '11px', color: '#3182ce' }}>Quiz • {quiz.questions?.length || 0} Questions</span>
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                                                {(viewingAs === 'hod' || viewingAs === 'faculty') && (
+                                                                    <>
+                                                                        <button onClick={() => handleEditQuiz(quiz)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>✏️</button>
+                                                                        <button onClick={() => deleteQuiz(quiz._id)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>🗑️</button>
+                                                                    </>
+                                                                )}
+                                                                <div onClick={() => setSubTab('quizzes')} style={{ background: '#bee3f8', color: '#2b6cb0', padding: '4px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: 'bold' }}>VIEW</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    {(!mod.materials?.length && !mod.assignments?.length && !mod.quizzes?.length) && 
+                                                        <p style={{ fontSize: '14px', color: '#a0aec0', margin: '10px 0', textAlign: 'center', fontStyle: 'italic' }}>No content added to this module yet.</p>
+                                                    }
                                                 </div>
                                             </div>
                                         ))}
@@ -672,13 +923,53 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                             <div>
                                 <h4 style={{ marginBottom: '20px' }}>Course Assignments</h4>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                    {(activeCourse.modules || []).flatMap(m => m.assignments || []).map((asn, idx) => (
+                                    {(activeCourse.modules || [])
+                                        .flatMap(m => m.assignments || [])
+                                        .filter(a => a && typeof a === 'object')
+                                        .map((asn, idx) => (
 
                                         <div key={idx} style={{ padding: '20px', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                 <div>
                                                     <h5 style={{ margin: '0 0 5px 0', fontSize: '16px' }}>{asn.title}</h5>
                                                     <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#4a5568', lineHeight: '1.5' }}>{asn.description}</p>
+                                                    
+                                                    {(asn.attachmentUrl || asn.url) && (
+                                                        <div style={{ marginBottom: '10px' }}>
+                                                            <a 
+                                                                href={asn.attachmentUrl || asn.url} 
+                                                                target="_blank" 
+                                                                rel="noreferrer" 
+                                                                style={{ 
+                                                                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                                                    padding: '5px 12px', background: '#ebf8ff', color: '#2b6cb0',
+                                                                    borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
+                                                                    textDecoration: 'none', border: '1px solid #bee3f8'
+                                                                }}
+                                                            >
+                                                                📄 View Assignment Question (PDF)
+                                                            </a>
+                                                        </div>
+                                                    )}
+
+                                                    {asn.attachments && asn.attachments.length > 0 && asn.attachments.map((at, ai) => (
+                                                        <div key={ai} style={{ marginBottom: '10px' }}>
+                                                            <a 
+                                                                href={at.url} 
+                                                                target="_blank" 
+                                                                rel="noreferrer" 
+                                                                style={{ 
+                                                                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                                                    padding: '5px 12px', background: '#ebf8ff', color: '#2b6cb0',
+                                                                    borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
+                                                                    textDecoration: 'none', border: '1px solid #bee3f8'
+                                                                }}
+                                                            >
+                                                                📄 {at.title || 'View Attachment'}
+                                                            </a>
+                                                        </div>
+                                                    ))}
+
                                                     <p style={{ margin: 0, fontSize: '12px', fontWeight: 'bold', color: '#f56565' }}>Due: {new Date(asn.dueDate).toLocaleDateString()} | Max Marks: {asn.maxMarks}</p>
                                                 </div>
                                                  <button 
@@ -697,9 +988,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                             {viewingAs === 'student' && mySubmissions.find(s => s.assignmentId === asn._id) && (
                                                 <div style={{ marginTop: '15px', padding: '10px', background: 'white', borderRadius: '8px', border: '1px solid #edf2f7', fontSize: '13px' }}>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                                                        <span style={{ color: '#718096' }}>Status:</span>
-                                                        <span style={{ color: mySubmissions.find(s => s.assignmentId === asn._id).status === 'graded' ? '#48bb78' : '#4c51bf', fontWeight: 'bold' }}>
-                                                            {mySubmissions.find(s => s.assignmentId === asn._id).status.toUpperCase()}
+                                                        <span style={{ color: '#718096' }}>Status:</span><span style={{ color: mySubmissions.find(s => s.assignmentId === asn._id).status === "graded" ? "#48bb78" : "#4c51bf", fontWeight: "bold" }}>{mySubmissions.find(s => s.assignmentId === asn._id).status.toUpperCase()}</span></div>{mySubmissions.find(s => s.assignmentId === asn._id).content && <div style={{ marginTop: "10px", padding: "10px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #edf2f7", fontSize: "13px" }}><strong>Your Submission:</strong> {mySubmissions.find(s => s.assignmentId === asn._id).content}</div>}{mySubmissions.find(s => s.assignmentId === asn._id).fileUrl && <div style={{ marginTop: "8px" }}><a href={mySubmissions.find(s => s.assignmentId === asn._id).fileUrl} target="_blank" rel="noreferrer" style={{ color: "#4c51bf", fontWeight: "bold", textDecoration: "underline", fontSize: "13px" }}>View Submitted Document</a></div>}<div><span>
                                                         </span>
                                                     </div>
                                                     {mySubmissions.find(s => s.assignmentId === asn._id).grade !== null && (
@@ -744,7 +1033,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                         <div key={sub._id} style={{ padding: '15px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <div>
                                                 <div style={{ fontWeight: 'bold' }}>{sub.studentId?.name}</div>
-                                                <div style={{ fontSize: '12px', color: '#718096' }}>Submitted: {new Date(sub.submittedAt).toLocaleString()}</div>
+                                                <div style={{ fontSize: '12px', color: '#718096' }}>Submitted: {new Date(sub.submittedAt).toLocaleString()}</div>{sub.content && <div style={{ marginTop: "8px", padding: "8px", background: "white", borderRadius: "6px", border: "1px solid #edf2f7", fontSize: "12px", maxWidth: "400px" }}><strong>Content:</strong> {sub.content}</div>}{sub.fileUrl && <div style={{ marginTop: "5px" }}><a href={sub.fileUrl} target="_blank" rel="noreferrer" style={{ background: "#edf2f7", color: "#4c51bf", padding: "5px 10px", borderRadius: "5px", textDecoration: "none", fontSize: "11px", display: "inline-block" }}>View Document</a></div>}{sub.content && <div style={{ marginTop: "8px", padding: "8px", background: "white", borderRadius: "6px", border: "1px solid #edf2f7", fontSize: "12px", maxWidth: "400px" }}><strong>Content:</strong> {sub.content}</div>}{sub.fileUrl && <div style={{ marginTop: "5px" }}><a href={sub.fileUrl} target="_blank" rel="noreferrer" style={{ background: "#edf2f7", color: "#4c51bf", padding: "5px 10px", borderRadius: "5px", textDecoration: "none", fontSize: "11px", display: "inline-block" }}>View Document</a></div>}
                                                 {sub.grade && <div style={{ fontSize: '12px', color: '#48bb78', fontWeight: 'bold' }}>Grade: {sub.grade}</div>}
                                             </div>
                                             <div style={{ display: 'flex', gap: '10px' }}>
@@ -866,7 +1155,10 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                             <span>⏱️</span> Course Assessments
                                         </h4>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-                                            {(activeCourse.modules || []).flatMap(m => m.quizzes || []).map((quiz, idx) => (
+                                            {(activeCourse.modules || [])
+                                                .flatMap(m => m.quizzes || [])
+                                                .filter(q => q && typeof q === 'object')
+                                                .map((quiz, idx) => (
                                                 quiz && typeof quiz === 'object' && (
 
                                                 <React.Fragment key={idx}>
@@ -882,12 +1174,26 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                                         </div>
                                                         <div style={{ display: 'flex', gap: '12px' }}>
                                                             {(viewingAs === 'hod' || viewingAs === 'faculty') && (
-                                                                <button 
-                                                                    onClick={() => handleAddQuestionToQuiz(quiz._id)}
-                                                                    style={{ background: '#edf2f7', color: '#4c51bf', border: 'none', padding: '10px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
-                                                                >
-                                                                    + Add Question
-                                                                </button>
+                                                                <>
+                                                                    <button 
+                                                                        onClick={() => handleAddQuestionToQuiz(quiz._id)}
+                                                                        style={{ background: '#edf2f7', color: '#4c51bf', border: 'none', padding: '10px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                                    >
+                                                                        + Add Question
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleEditQuiz(quiz)}
+                                                                        style={{ background: '#edf2f7', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
+                                                                    >
+                                                                        ✏️
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => deleteQuiz(quiz._id)}
+                                                                        style={{ background: '#fee2e2', color: '#ef4444', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
+                                                                    >
+                                                                        🗑️
+                                                                    </button>
+                                                                </>
                                                             )}
                                                             <button 
                                                                 onClick={() => startQuiz(quiz)}
@@ -1000,32 +1306,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                             <div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                                     <h4 style={{ margin: 0 }}>Enrolled Students ({activeCourse.students?.length || 0})</h4>
-                                    {(viewingAs === 'hod' || viewingAs === 'faculty') && (
-                                        <div style={{ display: 'flex', gap: '15px', alignItems: 'center', background: '#f8fafc', padding: '10px 20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1a202c' }}>Enroll New Student</div>
-                                                <div style={{ fontSize: '11px', color: '#718096' }}>Students must be enrolled to see content</div>
-                                            </div>
-                                            <select 
-                                                onChange={(e) => {
-                                                    if (e.target.value) {
-                                                        enrollStudent(e.target.value);
-                                                        e.target.value = "";
-                                                    }
-                                                }}
-                                                style={{ padding: '5px', borderRadius: '5px', border: '1px solid #e2e8f0' }}
-                                                defaultValue=""
-                                            >
-                                                <option value="" disabled>Select a student</option>
-                                                {institutionStudents
-                                                    .filter(s => !activeCourse.students?.some(as => as._id === s._id))
-                                                    .map(s => (
-                                                        <option key={s._id} value={s._id}>{s.name} ({s.username})</option>
-                                                    ))
-                                                }
-                                            </select>
-                                        </div>
-                                    )}
+                                    <h4 style={{ margin: 0 }}>Students in this Course ({activeCourse.students?.length || 0})</h4>
                                 </div>
                                 
                                 <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
@@ -1037,6 +1318,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                                 <th style={{ textAlign: 'left', padding: '12px 20px', fontSize: '13px', color: '#4a5568' }}>Last Active</th>
                                                 <th style={{ textAlign: 'center', padding: '12px 20px', fontSize: '13px', color: '#4a5568' }}>Logins</th>
                                                 <th style={{ textAlign: 'center', padding: '12px 20px', fontSize: '13px', color: '#4a5568' }}>Progress</th>
+                                                {(viewingAs === 'hod' || viewingAs === 'faculty') && <th style={{ textAlign: 'center', padding: '12px 20px', fontSize: '13px', color: '#4a5568' }}>Action</th>}
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1061,14 +1343,22 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                                     <td style={{ padding: '12px 20px', fontSize: '13px', color: '#4a5568' }}>
                                                         {s.lastLogin ? new Date(s.lastLogin).toLocaleString() : 'Never'}
                                                     </td>
-                                                    <td style={{ padding: '12px 20px', textAlign: 'center', fontSize: '14px' }}>
-                                                        {s.loginCount || 0}
-                                                    </td>
-                                                    <td style={{ padding: '12px 20px', textAlign: 'center' }}>
-                                                        <div style={{ width: '100px', height: '8px', background: '#edf2f7', borderRadius: '4px', margin: '0 auto', position: 'relative' }}>
-                                                            <div style={{ width: '10%', height: '100%', background: '#48bb78', borderRadius: '4px' }}></div>
+                                                    <td style={{ padding: '12px 20px', textAlign: 'center', color: '#4c51bf', fontWeight: 'bold' }}>{s.loginCount || 0}</td>
+                                                    <td style={{ padding: '12px 20px' }}>
+                                                        <div style={{ width: '100%', background: '#edf2f7', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+                                                            <div style={{ width: '0%', background: '#4c51bf', height: '100%' }}></div>
                                                         </div>
                                                     </td>
+                                                    {(viewingAs === 'hod' || viewingAs === 'faculty') && (
+                                                        <td style={{ padding: '12px 20px', textAlign: 'center' }}>
+                                                            <button 
+                                                                onClick={() => unenrollStudent(s._id)}
+                                                                style={{ background: '#fee2e2', color: '#ef4444', border: 'none', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             ))}
                                             {activeCourse.students?.length === 0 && (
@@ -1081,9 +1371,11 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                 </div>
                             </div>
                         )}
-                    </div>
+                        </>
+                    )}
                 </div>
-            )}
+            </div>
+        )}
             {/* Modals for Adding Content */}
             {showAddModal && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>

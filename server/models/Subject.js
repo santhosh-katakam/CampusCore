@@ -7,4 +7,8 @@ const SubjectSchema = new mongoose.Schema({
     slotGroup: { type: String, enum: ['A', 'B', null], default: null },
 });
 
-module.exports = mongoose.model('Subject', SubjectSchema);
+const getSubjectModel = (connection) => {
+    return connection.models.Subject || connection.model('Subject', SubjectSchema);
+};
+
+module.exports = { SubjectSchema, getSubjectModel };

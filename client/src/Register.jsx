@@ -11,9 +11,11 @@ const Register = ({ onBack }) => {
         institutionId: ''
     });
     const [institutions, setInstitutions] = useState([]);
+    const [batches, setBatches] = useState([]);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
+    const [batchSearch, setBatchSearch] = useState('');
 
     useEffect(() => {
         const fetchInstitutions = async () => {
@@ -30,9 +32,50 @@ const Register = ({ onBack }) => {
         fetchInstitutions();
     }, []);
 
+    useEffect(() => {
+        const fetchBatches = async () => {
+            if (!formData.institutionId) return;
+            try {
+                const res = await axios.get(`/auth/batches-public/${formData.institutionId}`);
+                setBatches(res.data);
+                // If there are batches, set the first one as default for student registration
+                if (res.data.length > 0 && formData.role === 'STUDENT' && !formData.batch) {
+                    const firstBatch = res.data[0];
+                    setFormData(prev => ({ 
+                        ...prev, 
+                        batch: firstBatch.name || firstBatch.batchId,
+                        department: firstBatch.department || prev.department
+                    }));
+                }
+            } catch (err) {
+                console.error('Failed to fetch batches', err);
+            }
+        };
+        fetchBatches();
+    }, [formData.institutionId, formData.role]);
+
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData(prev => {
+            const newData = { ...prev, [name]: value };
+            
+            // Special handling for batch selection to auto-fill department if available
+            if (name === 'batch') {
+                const selectedBatch = batches.find(b => (b.name || b.batchId) === value);
+                if (selectedBatch && selectedBatch.department) {
+                    newData.department = selectedBatch.department;
+                }
+            }
+            return newData;
+        });
     };
+
+    const filteredBatches = batches.filter(b => {
+        const name = (b.name || b.batchId || '').toLowerCase();
+        const dept = (b.department || '').toLowerCase();
+        const search = batchSearch.toLowerCase();
+        return name.includes(search) || dept.includes(search);
+    });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -153,16 +196,33 @@ const Register = ({ onBack }) => {
                                     value={formData.department} onChange={handleChange}
                                 />
                             </div>
-                            {formData.role === 'STUDENT' && (
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1 ml-1" htmlFor="batch">Batch / Year</label>
-                                    <input
-                                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-purple-500 focus:ring-0 transition-all outline-none bg-gray-50/50"
-                                        id="batch" name="batch" type="text" placeholder="e.g. 2025-29" required
-                                        value={formData.batch} onChange={handleChange}
-                                    />
-                                </div>
-                            )}
+                             {formData.role === 'STUDENT' && (
+                                 <div className="space-y-2">
+                                     <label className="block text-sm font-bold text-gray-700 ml-1" htmlFor="batch">Batch / Year</label>
+                                     <div className="relative group">
+                                         <input 
+                                             type="text"
+                                             placeholder="🔍 Search batch..."
+                                             className="w-full px-4 py-2 text-xs rounded-t-xl border-2 border-gray-100 focus:border-purple-400 outline-none bg-gray-50/30 transition-all"
+                                             value={batchSearch}
+                                             onChange={(e) => setBatchSearch(e.target.value)}
+                                         />
+                                         <select
+                                             className="w-full px-4 py-3 rounded-b-xl border-2 border-t-0 border-gray-100 focus:border-purple-500 focus:ring-0 transition-all outline-none bg-white"
+                                             id="batch" name="batch" required
+                                             value={formData.batch} onChange={handleChange}
+                                         >
+                                             <option value="">-- Select Batch --</option>
+                                             {filteredBatches.map(b => (
+                                                 <option key={b._id} value={b.name || b.batchId}>
+                                                     {b.name || b.batchId} ({b.department})
+                                                 </option>
+                                             ))}
+                                             {filteredBatches.length === 0 && <option value="">No matching batches</option>}
+                                         </select>
+                                     </div>
+                                 </div>
+                             )}
                         </div>
                     )}
 

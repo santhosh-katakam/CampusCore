@@ -89,6 +89,12 @@ function AdminPortal({ role }) {
     const [batchSearch, setBatchSearch] = useState('');
     const [courseSearch, setCourseSearch] = useState('');
 
+    const [selectedItems, setSelectedItems] = useState([]); // Selected IDs for bulk actions
+
+    useEffect(() => {
+        setSelectedItems([]);
+    }, [dataTab]);
+
 
 
     const PERIODS = [
@@ -309,7 +315,7 @@ function AdminPortal({ role }) {
             // Actually, if completely empty, let's put allSubjects in Core so user can pick.
             if (allRelevant.length === 0) {
                 setCategorizedSubjects({
-                    Core: allSubjects.map(s => s.name).sort(),
+                    Core: [...new Set(allSubjects.map(s => s.name))].sort(),
                     Elective: [],
                     Training: []
                 });
@@ -638,6 +644,40 @@ function AdminPortal({ role }) {
         } catch (err) {
             alert('Error deleting timetable: ' + (err.response?.data?.error || err.message));
         }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedItems.length === 0) return;
+        const confirmed = window.confirm(`Are you sure you want to delete ${selectedItems.length} selected items? This action cannot be undone.`);
+        if (!confirmed) return;
+
+        try {
+            await api.post(`/${dataTab}/bulk-delete`, { ids: selectedItems });
+            setSelectedItems([]);
+            // Refresh the appropriate list
+            if (dataTab === 'faculty') fetchFaculty();
+            else if (dataTab === 'rooms') fetchRooms();
+            else if (dataTab === 'batches') fetchBatches();
+            else if (dataTab === 'courses') fetchCourses();
+            
+            alert('Items deleted successfully!');
+        } catch (err) {
+            alert('Error deleting items: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    const handleSelectAll = (filteredItems) => {
+        if (selectedItems.length === filteredItems.length) {
+            setSelectedItems([]);
+        } else {
+            setSelectedItems(filteredItems.map(item => item._id));
+        }
+    };
+
+    const handleSelectItem = (id) => {
+        setSelectedItems(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
     };
 
     const handleRegenerateTimetable = async (tt) => {
@@ -1392,13 +1432,17 @@ function AdminPortal({ role }) {
                                     <div className="flex gap-3 items-center flex-wrap">
                                         <input type="text" placeholder="🔍 Search by name, ID, dept, email..."
                                             value={facSearch} onChange={e => setFacSearch(e.target.value)}
-                                            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-60 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                                            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                                        {selectedItems.length > 0 && (
+                                            <button onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap shadow-sm transition-all animate-in fade-in slide-in-from-right-2">🗑️ Delete Selected ({selectedItems.length})</button>
+                                        )}
                                         <button onClick={() => openAddModal('faculty')} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">+ Add Faculty</button>
                                     </div>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm" style={{ borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                                         <colgroup>
+                                            <col style={{ width: '40px' }} />
                                             <col style={{ width: '90px' }} />
                                             <col style={{ width: '140px' }} />
                                             <col style={{ width: '200px' }} />
@@ -1408,6 +1452,9 @@ function AdminPortal({ role }) {
                                         </colgroup>
                                         <thead>
                                             <tr className="bg-gray-100 text-gray-700">
+                                                <th className="px-3 py-2 text-center border-b border-gray-200">
+                                                    <input type="checkbox" checked={selectedItems.length === filtered.length && filtered.length > 0} onChange={() => handleSelectAll(filtered)} className="accent-purple-600 cursor-pointer w-4 h-4" />
+                                                </th>
                                                 <th className="px-3 py-2 text-center font-semibold border-b border-gray-200">Max Weekly Load</th>
                                                 <th className="px-3 py-2 text-left font-semibold border-b border-gray-200">Faculty ID</th>
                                                 <th className="px-3 py-2 text-left font-semibold border-b border-gray-200">Name</th>
@@ -1418,9 +1465,12 @@ function AdminPortal({ role }) {
                                         </thead>
                                         <tbody>
                                             {filtered.length === 0 ? (
-                                                <tr><td colSpan={6} className="text-center py-10 text-gray-400">{facSearch ? 'No matching faculty found.' : 'No faculty records found.'}</td></tr>
+                                                <tr><td colSpan={7} className="text-center py-10 text-gray-400">{facSearch ? 'No matching faculty found.' : 'No faculty records found.'}</td></tr>
                                             ) : filtered.map(f => (
-                                                <tr key={f._id} className="border-b border-gray-100 hover:bg-purple-50 transition">
+                                                <tr key={f._id} className={`border-b border-gray-100 hover:bg-purple-50 transition ${selectedItems.includes(f._id) ? 'bg-purple-50' : ''}`}>
+                                                    <td className="px-3 py-2.5 text-center">
+                                                        <input type="checkbox" checked={selectedItems.includes(f._id)} onChange={() => handleSelectItem(f._id)} className="accent-purple-600 cursor-pointer w-4 h-4" />
+                                                    </td>
                                                     <td className="px-3 py-2.5 text-center font-medium text-gray-700">{f.maxWeeklyLoad ?? '—'}</td>
                                                     <td className="px-3 py-2.5 text-xs text-gray-500 font-mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.facultyId}>{f.facultyId || '—'}</td>
                                                     <td className="px-3 py-2.5 font-semibold text-gray-800" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.name}>{f.name || '—'}</td>
@@ -1457,18 +1507,27 @@ function AdminPortal({ role }) {
                                         <input type="text" placeholder="🔍 Search by name, ID, type..."
                                             value={roomSearch} onChange={e => setRoomSearch(e.target.value)}
                                             className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                                        {selectedItems.length > 0 && (
+                                            <button onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap shadow-sm">🗑️ Delete Selected ({selectedItems.length})</button>
+                                        )}
                                         <button onClick={() => openAddModal('rooms')} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">+ Add Room</button>
                                     </div>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm border-collapse">
                                         <thead><tr className="bg-gray-100">
+                                            <th className="px-3 py-2 text-left border-b border-gray-200 w-10">
+                                                <input type="checkbox" checked={selectedItems.length === filtered.length && filtered.length > 0} onChange={() => handleSelectAll(filtered)} className="accent-purple-600 cursor-pointer" />
+                                            </th>
                                             {['Room ID', 'Name', 'Type', 'Capacity', 'Session Year', 'Actions'].map(h => <th key={h} className="px-3 py-2 text-left font-semibold border-b">{h}</th>)}
                                         </tr></thead>
                                         <tbody>
-                                            {filtered.length === 0 ? <tr><td colSpan={6} className="text-center py-8 text-gray-400">{roomSearch ? 'No matching rooms found.' : 'No records.'}</td></tr>
+                                            {filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-gray-400">{roomSearch ? 'No matching rooms found.' : 'No records.'}</td></tr>
                                                 : filtered.map(r => (
-                                                    <tr key={r._id} className="border-b hover:bg-gray-50">
+                                                    <tr key={r._id} className={`border-b hover:bg-gray-50 ${selectedItems.includes(r._id) ? 'bg-purple-50' : ''}`}>
+                                                        <td className="px-3 py-2">
+                                                            <input type="checkbox" checked={selectedItems.includes(r._id)} onChange={() => handleSelectItem(r._id)} className="accent-purple-600 cursor-pointer" />
+                                                        </td>
                                                         <td className="px-3 py-2 text-gray-500 text-xs">{r.roomId}</td>
                                                         <td className="px-3 py-2 font-medium">{r.name}</td>
                                                         <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded text-xs font-semibold ${r.type?.toLowerCase().includes('lab') ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{r.type}</span></td>
@@ -1502,18 +1561,27 @@ function AdminPortal({ role }) {
                                         <input type="text" placeholder="🔍 Search by ID, degree, dept, session..."
                                             value={batchSearch} onChange={e => setBatchSearch(e.target.value)}
                                             className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-60 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                                        {selectedItems.length > 0 && (
+                                            <button onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap shadow-sm">🗑️ Delete Selected ({selectedItems.length})</button>
+                                        )}
                                         <button onClick={() => openAddModal('batches')} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">+ Add Batch</button>
                                     </div>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm border-collapse">
                                         <thead><tr className="bg-gray-100">
+                                            <th className="px-3 py-2 text-left border-b border-gray-200 w-10">
+                                                <input type="checkbox" checked={selectedItems.length === filtered.length && filtered.length > 0} onChange={() => handleSelectAll(filtered)} className="accent-purple-600 cursor-pointer" />
+                                            </th>
                                             {['Batch ID', 'Degree', 'Year', 'Department', 'Semester', 'Session', 'Actions'].map(h => <th key={h} className="px-3 py-2 text-left font-semibold border-b">{h}</th>)}
                                         </tr></thead>
                                         <tbody>
-                                            {filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-8 text-gray-400">{batchSearch ? 'No matching batches found.' : 'No records.'}</td></tr>
+                                            {filtered.length === 0 ? <tr><td colSpan={8} className="text-center py-8 text-gray-400">{batchSearch ? 'No matching batches found.' : 'No records.'}</td></tr>
                                                 : filtered.map(b => (
-                                                    <tr key={b._id} className="border-b hover:bg-gray-50">
+                                                    <tr key={b._id} className={`border-b hover:bg-gray-50 ${selectedItems.includes(b._id) ? 'bg-purple-50' : ''}`}>
+                                                        <td className="px-3 py-2">
+                                                            <input type="checkbox" checked={selectedItems.includes(b._id)} onChange={() => handleSelectItem(b._id)} className="accent-purple-600 cursor-pointer" />
+                                                        </td>
                                                         <td className="px-3 py-2 text-gray-500 text-xs">{b.batchId}</td>
                                                         <td className="px-3 py-2 font-medium">{b.degree}</td>
                                                         <td className="px-3 py-2 text-gray-600">{b.yearLabel}</td>
@@ -1548,18 +1616,27 @@ function AdminPortal({ role }) {
                                         <input type="text" placeholder="🔍 Search by subject, code, faculty, batch..."
                                             value={courseSearch} onChange={e => setCourseSearch(e.target.value)}
                                             className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                                        {selectedItems.length > 0 && (
+                                            <button onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap shadow-sm">🗑️ Delete Selected ({selectedItems.length})</button>
+                                        )}
                                         <button onClick={() => openAddModal('courses')} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">+ Add Course</button>
                                     </div>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm border-collapse">
                                         <thead><tr className="bg-gray-100">
+                                            <th className="px-3 py-2 text-left border-b border-gray-200 w-10">
+                                                <input type="checkbox" checked={selectedItems.length === filtered.length && filtered.length > 0} onChange={() => handleSelectAll(filtered)} className="accent-purple-600 cursor-pointer" />
+                                            </th>
                                             {['Code', 'Subject', 'Type', 'Faculty', 'Batch', 'L/T/P', 'Credits', 'Actions'].map(h => <th key={h} className="px-3 py-2 text-left font-semibold border-b">{h}</th>)}
                                         </tr></thead>
                                         <tbody>
-                                            {filtered.length === 0 ? <tr><td colSpan={8} className="text-center py-8 text-gray-400">{courseSearch ? 'No matching courses found.' : 'No records.'}</td></tr>
+                                            {filtered.length === 0 ? <tr><td colSpan={9} className="text-center py-8 text-gray-400">{courseSearch ? 'No matching courses found.' : 'No records.'}</td></tr>
                                                 : filtered.map(c => (
-                                                    <tr key={c._id} className="border-b hover:bg-gray-50">
+                                                    <tr key={c._id} className={`border-b hover:bg-gray-50 ${selectedItems.includes(c._id) ? 'bg-purple-50' : ''}`}>
+                                                        <td className="px-3 py-2">
+                                                            <input type="checkbox" checked={selectedItems.includes(c._id)} onChange={() => handleSelectItem(c._id)} className="accent-purple-600 cursor-pointer" />
+                                                        </td>
                                                         <td className="px-3 py-2 text-gray-500 text-xs">{c.courseCode}</td>
                                                         <td className="px-3 py-2 font-medium max-w-[160px] truncate" title={c.subject}>{c.subject}</td>
                                                         <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded text-xs font-semibold ${c.type === 'Elective' ? 'bg-pink-100 text-pink-700' : 'bg-green-100 text-green-700'}`}>{c.type}</span></td>

@@ -103,7 +103,7 @@ const BatchConfigColumn = ({ batch, title, selectedBatches, allSubjects, rooms, 
 
         const allRelevant = [...newCategorized.Core, ...newCategorized.Elective];
         if (allRelevant.length === 0) {
-            newCategorized.Core = (allSubjects || []).map(s => s.name).sort();
+            newCategorized.Core = [...new Set((allSubjects || []).map(s => s.name))].sort();
         }
         setCategorizedSubjects(newCategorized);
     }, [batch, courses, allSubjects]);

@@ -9,4 +9,8 @@ const FacultySchema = new mongoose.Schema({
   maxWeeklyLoad: { type: Number, default: 20 }
 });
 
-module.exports = mongoose.model('Faculty', FacultySchema);
+const getFacultyModel = (connection) => {
+  return connection.models.Faculty || connection.model('Faculty', FacultySchema);
+};
+
+module.exports = { FacultySchema, getFacultyModel };

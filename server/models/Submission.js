@@ -11,4 +11,8 @@ const SubmissionSchema = new mongoose.Schema({
     feedback: String
 });
 
-module.exports = mongoose.model('Submission', SubmissionSchema);
+const getSubmissionModel = (connection) => {
+    return connection.models.Submission || connection.model('Submission', SubmissionSchema);
+};
+
+module.exports = { SubmissionSchema, getSubmissionModel };

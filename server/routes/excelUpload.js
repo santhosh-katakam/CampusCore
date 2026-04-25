@@ -4,20 +4,41 @@ const XLSX = require('xlsx');
 const router = express.Router();
 
 // Models
-const Faculty = require('../models/Faculty');
-const Room = require('../models/Room');
-const Batch = require('../models/Batch');
-const Course = require('../models/Course');
-const Subject = require('../models/Subject');
-
-const TimetableConfig = require('../models/TimetableConfig');
+// Models (Registries)
+const FacultyRegistry = require('../models/Faculty');
+const RoomRegistry = require('../models/Room');
+const BatchRegistry = require('../models/Batch');
+const CourseRegistry = require('../models/Course');
+const SubjectRegistry = require('../models/Subject');
+const TimetableConfigRegistry = require('../models/TimetableConfig');
+const mongoose = require('mongoose');
 
 // Configure multer for file upload
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+// Helper: Resolve the correct model based on tenancy
+const getModels = (req) => {
+    return req.tenantModels || {
+        Faculty: FacultyRegistry.getFacultyModel(mongoose.connection),
+        Room: RoomRegistry.getRoomModel(mongoose.connection),
+        Batch: BatchRegistry.getBatchModel(mongoose.connection),
+        Course: CourseRegistry.getCourseModel(mongoose.connection),
+        Subject: SubjectRegistry.getSubjectModel(mongoose.connection),
+        TimetableConfig: TimetableConfigRegistry.getTimetableConfigModel(mongoose.connection)
+    };
+};
+
 // Middleware to extract institutionId (consistent with api.js)
-const getInstitutionId = (req) => req.headers['x-institution-id'] || process.env.DEFAULT_INSTITUTION_ID;
+const getInstitutionId = (req) => {
+    if (req.user && req.user.institutionId) return req.user.institutionId;
+    const id = req.headers['x-institution-id'];
+    if (!id || id === 'null' || id === 'undefined' || id === '') {
+        return process.env.DEFAULT_INSTITUTION_ID;
+    }
+    return id;
+};
+
 
 // Helper function to parse Excel file
 function parseExcelFile(buffer) {
@@ -35,6 +56,7 @@ function parseExcelFile(buffer) {
 // Upload and process Excel file
 router.post('/upload', upload.single('file'), async (req, res) => {
     try {
+        const { Faculty, Room, Batch, Course, Subject } = getModels(req);
         const institutionId = getInstitutionId(req);
         if (!institutionId) return res.status(400).json({ error: 'Institution ID required for upload' });
 
@@ -288,9 +310,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                         ''
                     ).trim();
 
-                    const year = String(
+                    const yearLabel = String(
                         row['Year'] ||
                         row['Academic Year'] ||
+                        row['year'] ||
                         ''
                     ).trim();
 
@@ -304,53 +327,43 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                     const session = String(
                         row['Session'] ||
                         row['Session Year'] ||
+                        row['Academic Session'] ||
                         ''
                     ).trim();
 
 
-                    if (!batchId || !semester || !degree || !year || !department || !session) {
-                        results.batches.errors.push(`Missing required fields - Batch: ${batchId}, Semester: ${semester}, Degree: ${degree}, Year: ${year}, Dept: ${department}, Session: ${session}`);
+                    if (!batchId || !semester) {
+                        results.batches.errors.push(`Row ${results.batches.added + results.batches.updated + results.batches.errors.length + 1}: Missing critical fields (Batch ID or Semester).`);
                         continue;
                     }
 
-                    // Convert year to number
+                    // Convert year to number just in case
                     let yearNumber = 1;
-                    if (year.toLowerCase().includes('second') || year.includes('2')) yearNumber = 2;
-                    else if (year.toLowerCase().includes('third') || year.includes('3')) yearNumber = 3;
-                    else if (year.toLowerCase().includes('fourth') || year.includes('4')) yearNumber = 4;
+                    if (yearLabel.toLowerCase().includes('second') || yearLabel.includes('2')) yearNumber = 2;
+                    else if (yearLabel.toLowerCase().includes('third') || yearLabel.includes('3')) yearNumber = 3;
+                    else if (yearLabel.toLowerCase().includes('fourth') || yearLabel.includes('4')) yearNumber = 4;
+
+                    const batchData = {
+                        batchId,
+                        semester,
+                        degree,
+                        yearLabel,
+                        department,
+                        session,
+                        institutionId
+                    };
 
                     const existing = await Batch.findOne({ batchId, institutionId });
                     if (existing) {
-                        await Batch.updateOne(
-                            { batchId, institutionId },
-                            {
-                                name: batchId,
-                                semester,
-                                degree,
-                                year,
-                                yearNumber,
-                                department,
-                                session
-                            }
-                        );
+                        await Batch.updateOne({ _id: existing._id }, batchData);
                         results.batches.updated++;
                     } else {
-                        await Batch.create({
-                            batchId,
-                            name: batchId,
-                            semester,
-                            degree,
-                            year,
-                            yearNumber,
-                            department,
-                            session,
-                            institutionId
-                        });
+                        await Batch.create(batchData);
                         results.batches.added++;
                     }
                 } catch (err) {
                     console.error('Error processing batch row:', err);
-                    results.batches.errors.push(err.message);
+                    results.batches.errors.push(`Row ${results.batches.added + results.batches.updated + results.batches.errors.length + 1}: ${err.message}`);
                 }
             }
         } else {
@@ -527,6 +540,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 // Get upload statistics
 router.get('/stats', async (req, res) => {
     try {
+        const { Faculty, Room, Batch, Course, Subject } = getModels(req);
         const institutionId = getInstitutionId(req);
         const filter = institutionId ? { institutionId } : {};
 
@@ -540,6 +554,79 @@ router.get('/stats', async (req, res) => {
         res.json(stats);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Helper to generate and send a single-sheet Excel workbook
+const sendSingleSheetTemplate = (res, data, sheetName, filename) => {
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(buffer);
+};
+
+// 1. Faculty Template
+router.get('/template/faculty', (req, res) => {
+    const data = [{ "Faculty ID": "FAC001", "Faculty Name": "Dr. John Doe", "Faculty Department": "Computer Science", "Faculty Email": "john.doe@university.edu" }];
+    sendSingleSheetTemplate(res, data, "Faculty", "faculty_template.xlsx");
+});
+
+// 2. Rooms Template
+router.get('/template/rooms', (req, res) => {
+    const data = [{ "Room ID": "R101", "Room Name/Number": "Room 101", "Room Type": "Theory", "Capacity": 60, "Session": "2024-25" }];
+    sendSingleSheetTemplate(res, data, "Rooms", "rooms_template.xlsx");
+});
+
+// 3. Batches Template
+router.get('/template/batches', (req, res) => {
+    const data = [{ "Batch ID": "CSE-A", "Semester": "V", "Degree": "B.Tech", "Year": "Third Year", "Department": "CSE", "Session": "2024-25" }];
+    sendSingleSheetTemplate(res, data, "Batches", "batches_template.xlsx");
+});
+
+// 4. Course Data Template
+router.get('/template/courses', (req, res) => {
+    const data = [{ 
+        "Faculty ID": "FAC001", "Faculty Name": "Dr. John Doe", "Course Code": "CS301", "Subject": "Data Structures", 
+        "Type": "Core", "Batch": "CSE-A", "Course L": 3, "Course T": 1, "Course P": 0, "Credits": 4, 
+                "Semester": "V", "Program": "B.Tech", "Department": "CSE", "Session": "2024-25" 
+    }];
+    sendSingleSheetTemplate(res, data, "Course Data", "courses_template.xlsx");
+});
+
+// Download All-in-One Excel Template
+router.get('/template', (req, res) => {
+    try {
+        const workbook = XLSX.utils.book_new();
+
+        // Faculty
+        const facultyData = [{ "Faculty ID": "FAC001", "Faculty Name": "Dr. John Doe", "Faculty Department": "Computer Science", "Faculty Email": "john.doe@university.edu" }];
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(facultyData), "Faculty");
+
+        // Rooms
+        const roomData = [{ "Room ID": "R101", "Room Name/Number": "Room 101", "Room Type": "Theory", "Capacity": 60, "Session": "2024-25" }];
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(roomData), "Rooms");
+
+        // Batches
+        const batchData = [{ "Batch ID": "CSE-A", "Semester": "V", "Degree": "B.Tech", "Year": "Third Year", "Department": "CSE", "Session": "2024-25" }];
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(batchData), "Batches");
+
+        // Course Data
+        const courseData = [{ 
+            "Faculty ID": "FAC001", "Faculty Name": "Dr. John Doe", "Course Code": "CS301", "Subject": "Data Structures", 
+            "Type": "Core", "Batch": "CSE-A", "Course L": 3, "Course T": 1, "Course P": 0, "Credits": 4, 
+            "Semester": "V", "Program": "B.Tech", "Department": "CSE", "Session": "2024-25" 
+        }];
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(courseData), "Course Data");
+
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=university_full_template.xlsx');
+        res.send(buffer);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to generate template' });
     }
 });
 

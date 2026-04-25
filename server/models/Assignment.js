@@ -8,7 +8,13 @@ const AssignmentSchema = new mongoose.Schema({
     dueDate: { type: Date, required: true },
     maxMarks: { type: Number, required: true },
     attachments: [{ title: String, url: String }],
+    attachmentUrl: String,
+    url: String,
     createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Assignment', AssignmentSchema);
+const getAssignmentModel = (connection) => {
+    return connection.models.Assignment || connection.model('Assignment', AssignmentSchema);
+};
+
+module.exports = { AssignmentSchema, getAssignmentModel };

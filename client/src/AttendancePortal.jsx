@@ -30,7 +30,8 @@ const AttendancePortal = ({ user, viewingAs }) => {
         } else {
             // Both Faculty and Admin/HOD need courses to mark attendance or filter reports
             fetchCourses();
-            if (viewingAs === 'hod') fetchAdminReports();
+            // If HOD, fetch reports immediately. Faculty can switch to them.
+            if (viewingAs === 'hod' || user.role === 'FACULTY') fetchAdminReports();
         }
     }, [viewingAs]);
 
@@ -274,10 +275,10 @@ const AttendancePortal = ({ user, viewingAs }) => {
                         background: reportType === rt ? '#4c51bf' : 'white', 
                         color: reportType === rt ? 'white' : '#4a5568', 
                         border: '1px solid #cbd5e0', 
-                        borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', textTransform: 'capitalize' 
+                        borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold'
                     }}
                 >
-                    {rt === 'history' ? 'Detailed History' : `${Math.abs(rt)} Wise`}
+                    {rt === 'history' && 'Detailed History'}
                     {rt === 'overall' && 'Overall Report'}
                     {rt === 'course' && 'Course Wise'}
                     {rt === 'month' && 'Month Wise'}
@@ -451,21 +452,6 @@ const AttendancePortal = ({ user, viewingAs }) => {
 
         return (
         <div style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', gap: '20px', marginBottom: '30px', borderBottom: '1px solid #e2e8f0', paddingBottom: '15px' }}>
-                <button 
-                    onClick={() => setView('hod-mark')} 
-                    style={{ padding: '10px 20px', background: 'transparent', border: 'none', color: '#4c51bf', fontWeight: 'bold', cursor: 'pointer' }}
-                >
-                    📝 Mark Attendance
-                </button>
-                <button 
-                    onClick={() => setView('hod')} 
-                    style={{ padding: '10px 20px', background: 'transparent', border: 'none', color: '#4c51bf', fontWeight: 'bold', borderBottom: '3px solid #4c51bf', cursor: 'pointer' }}
-                >
-                    📈 View Reports
-                </button>
-            </div>
-
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h2>Institution Attendance Report</h2>
                 <button 
@@ -508,8 +494,39 @@ const AttendancePortal = ({ user, viewingAs }) => {
         );
     };
 
+    const canViewReports = ['COLLEGE_ADMIN', 'HOD', 'FACULTY'].includes(user.role);
+    const markView = user.role === 'FACULTY' ? 'faculty' : 'hod-mark';
+
     return (
         <div style={{ minHeight: '80vh' }}>
+            {canViewReports && (
+                <div style={{ padding: '20px 20px 0 20px' }}>
+                    <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '15px' }}>
+                        <button 
+                            onClick={() => setView(markView)} 
+                            style={{ 
+                                padding: '10px 20px', background: 'transparent', border: 'none', 
+                                color: view === markView ? '#4c51bf' : '#718096', 
+                                fontWeight: 'bold', cursor: 'pointer',
+                                borderBottom: view === markView ? '3px solid #4c51bf' : 'none'
+                            }}
+                        >
+                            📝 Mark Attendance
+                        </button>
+                        <button 
+                            onClick={() => { setView('hod'); fetchAdminReports(); }} 
+                            style={{ 
+                                padding: '10px 20px', background: 'transparent', border: 'none', 
+                                color: view === 'hod' ? '#4c51bf' : '#718096', 
+                                fontWeight: 'bold', cursor: 'pointer',
+                                borderBottom: view === 'hod' ? '3px solid #4c51bf' : 'none'
+                            }}
+                        >
+                            📈 View Reports
+                        </button>
+                    </div>
+                </div>
+            )}
             {view === 'student' && renderStudentView()}
             {(view === 'faculty' || view === 'hod-mark') && renderFacultyView()}
             {view === 'hod' && renderAdminView()}

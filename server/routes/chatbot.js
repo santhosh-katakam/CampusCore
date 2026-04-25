@@ -1,11 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const OpenAI = require('openai');
-const Timetable = require('../models/Timetable');
+const TimetableRegistry = require('../models/Timetable');
+const mongoose = require('mongoose');
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 }) : null;
+
+// Helper to resolve models
+const getChatbotModels = (req) => {
+    return {
+        Timetable: req.tenantModels?.Timetable || TimetableRegistry.getTimetableModel(mongoose.connection)
+    };
+};
+
+// Helper: extract institution id
+const getInstitutionId = (req) => {
+    if (req.user && req.user.institutionId) return req.user.institutionId;
+    const id = req.headers['x-institution-id'];
+    return id && id !== 'null' ? id : process.env.DEFAULT_INSTITUTION_ID;
+};
 
 // Fallback Knowledge Base (in case API is unavailable)
 const LOCAL_KB = {
@@ -18,11 +33,13 @@ const LOCAL_KB = {
 router.post('/', async (req, res) => {
     const { message, context } = req.body;
     const msg = message.toLowerCase();
+    const { Timetable } = getChatbotModels(req);
+    const institutionId = getInstitutionId(req);
 
     let studentTimetable = null;
-    if (context.batch) {
+    if (context.batch && institutionId) {
         try {
-            studentTimetable = await Timetable.findOne({ batch: context.batch }).lean();
+            studentTimetable = await Timetable.findOne({ batch: context.batch, institutionId }).lean();
         } catch (err) {
             console.error("Error fetching timetable for chatbot:", err);
         }

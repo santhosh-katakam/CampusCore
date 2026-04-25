@@ -1,18 +1,31 @@
 const express = require('express');
 const router = express.Router();
-const Job = require('../models/Job');
+const JobRegistry = require('../models/Job');
 const auth = require('../middleware/auth');
+const mongoose = require('mongoose');
+
+// Helper to resolve models
+const getJobModels = (req) => {
+    return {
+        Job: req.tenantModels?.Job || JobRegistry.getJobModel(mongoose.connection)
+    };
+};
 
 // Helper to get institution ID
 const getInstitutionId = (req) => {
     if (req.user && req.user.institutionId) return req.user.institutionId;
-    return req.headers['x-institution-id'];
+    const id = req.headers['x-institution-id'];
+    if (!id || id === 'null' || id === 'undefined' || id === '') {
+        return process.env.DEFAULT_INSTITUTION_ID;
+    }
+    return id;
 };
 
 // @route   GET /api/jobs
 // @desc    Get all jobs for the institution
 router.get('/', auth, async (req, res) => {
     try {
+        const { Job } = getJobModels(req);
         const institutionId = getInstitutionId(req);
         if (!institutionId) return res.status(400).json({ error: 'Institution ID required' });
 
@@ -27,6 +40,7 @@ router.get('/', auth, async (req, res) => {
 // @desc    Post a new job (HOD or Faculty)
 router.post('/', auth, async (req, res) => {
     try {
+        const { Job } = getJobModels(req);
         const { title, company, description, location, salary, link } = req.body;
         const institutionId = getInstitutionId(req);
 
@@ -34,7 +48,7 @@ router.post('/', auth, async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized to post jobs' });
         }
 
-        const newJob = new Job({
+        const job = new Job({
             title,
             company,
             description,
@@ -46,7 +60,7 @@ router.post('/', auth, async (req, res) => {
             postedByName: req.user.username
         });
 
-        const job = await newJob.save();
+        await job.save();
         res.json(job);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -57,7 +71,9 @@ router.post('/', auth, async (req, res) => {
 // @desc    Delete a job
 router.delete('/:id', auth, async (req, res) => {
     try {
-        const job = await Job.findById(req.params.id);
+        const { Job } = getJobModels(req);
+        const institutionId = getInstitutionId(req);
+        const job = await Job.findOne({ _id: req.params.id, institutionId });
         if (!job) return res.status(404).json({ error: 'Job not found' });
 
         // Only HOD or the person who posted it can delete
@@ -65,7 +81,7 @@ router.delete('/:id', auth, async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
-        await job.deleteOne();
+        await Job.deleteOne({ _id: req.params.id });
         res.json({ message: 'Job removed' });
     } catch (err) {
         res.status(500).json({ error: err.message });

@@ -125,14 +125,41 @@ const ExcelUpload = () => {
                 marginBottom: '30px'
             }}>
                 <div style={{ marginBottom: '20px' }}>
-                    <label style={{
-                        display: 'block',
-                        marginBottom: '10px',
-                        fontWeight: '600',
-                        color: '#333'
-                    }}>
-                        Select Excel File (.xlsx, .xls)
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <label style={{
+                            fontWeight: '600',
+                            color: '#333'
+                        }}>
+                            Select Excel File (.xlsx, .xls)
+                        </label>
+                        <a 
+                            href={`${api.defaults.baseURL}/excel/template`} 
+                            download 
+                            style={{
+                                color: '#667eea',
+                                textDecoration: 'none',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                border: '1px solid #667eea',
+                                padding: '4px 12px',
+                                borderRadius: '6px',
+                                transition: 'all 0.2s ease',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                            }}
+                            onMouseOver={(e) => {
+                                e.currentTarget.style.backgroundColor = '#667eea';
+                                e.currentTarget.style.color = 'white';
+                            }}
+                            onMouseOut={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                                e.currentTarget.style.color = '#667eea';
+                            }}
+                        >
+                            📥 Download Template
+                        </a>
+                    </div>
                     <input
                         type="file"
                         accept=".xlsx,.xls"
@@ -479,10 +506,22 @@ const ExcelUpload = () => {
                     📝 Excel File Requirements:
                 </h4>
                 <ul style={{ marginLeft: '20px', color: '#64748b', lineHeight: '1.8' }}>
-                    <li><strong>Faculty Sheet:</strong> Faculty ID, Faculty Name, Faculty Department, Faculty Email</li>
-                    <li><strong>Rooms Sheet:</strong> Room ID, Room Name/Number, Room Type, Capacity, Session</li>
-                    <li><strong>Batches Sheet:</strong> Semester, Batch ID, Degree, Year, Department, Session</li>
-                    <li><strong>Course Data Sheets:</strong> Faculty ID, Course Code, Subject, Type, Batch, Course L/T/P, Credits, etc.</li>
+                    <li>
+                        <strong>Faculty Sheet:</strong> Faculty ID, Faculty Name, Faculty Department, Faculty Email
+                        <a href={`${api.defaults.baseURL}/excel/template/faculty`} download style={{ marginLeft: '10px', color: '#4338ca', fontSize: '13px', textDecoration: 'underline' }}>Download Faculty Template</a>
+                    </li>
+                    <li>
+                        <strong>Rooms Sheet:</strong> Room ID, Room Name/Number, Room Type, Capacity, Session
+                        <a href={`${api.defaults.baseURL}/excel/template/rooms`} download style={{ marginLeft: '10px', color: '#4338ca', fontSize: '13px', textDecoration: 'underline' }}>Download Rooms Template</a>
+                    </li>
+                    <li>
+                        <strong>Batches Sheet:</strong> Semester, Batch ID, Degree, Year, Department, Session
+                        <a href={`${api.defaults.baseURL}/excel/template/batches`} download style={{ marginLeft: '10px', color: '#4338ca', fontSize: '13px', textDecoration: 'underline' }}>Download Batches Template</a>
+                    </li>
+                    <li>
+                        <strong>Course Data Sheets:</strong> Faculty ID, Course Code, Subject, Type, Batch, Course L/T/P, Credits, etc.
+                        <a href={`${api.defaults.baseURL}/excel/template/courses`} download style={{ marginLeft: '10px', color: '#4338ca', fontSize: '13px', textDecoration: 'underline' }}>Download Course Template</a>
+                    </li>
                 </ul>
             </div>
         </div>

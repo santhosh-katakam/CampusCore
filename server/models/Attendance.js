@@ -11,4 +11,8 @@ const AttendanceSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Attendance', AttendanceSchema);
+const getAttendanceModel = (connection) => {
+    return connection.models.Attendance || connection.model('Attendance', AttendanceSchema);
+};
+
+module.exports = { AttendanceSchema, getAttendanceModel };

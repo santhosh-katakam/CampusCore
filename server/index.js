@@ -10,6 +10,7 @@ const attendanceRoutes = require('./routes/attendance');
 const jobRoutes = require('./routes/jobs');
 const chatbotRoutes = require('./routes/chatbot');
 const authMiddleware = require('./middleware/auth');
+const tenantMiddleware = require('./middleware/tenant');
 
 require('dotenv').config();
 
@@ -26,6 +27,7 @@ app.use('/uploads', express.static('uploads'));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(authMiddleware);
+app.use(tenantMiddleware);
 
 // Routes
 app.use('/api/auth', authRoutes);

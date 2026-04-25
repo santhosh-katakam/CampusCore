@@ -1,10 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { getTenantModels } = require('../utils/tenantManager');
+const UserRegistry = require('../models/User');
 const Institution = require('../models/Institution');
+const BatchRegistry = require('../models/Batch');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key_123';
+
+// Helper: Resolve dynamic models
+const getAuthModels = async (req) => {
+    // If tenant context exists (from middleware), use it.
+    // Otherwise, use the main connection as fallback (e.g. for creating Company Admins)
+    return {
+        User: req.tenantModels?.User || UserRegistry.getUserModel(require('mongoose').connection),
+        Batch: req.tenantModels?.Batch || BatchRegistry.getBatchModel(require('mongoose').connection)
+    };
+};
 
 // @route   POST api/auth/login
 // @desc    Authenticate user & get token
@@ -12,8 +24,16 @@ router.post('/login', async (req, res) => {
     const { username, password, institutionId } = req.body;
 
     try {
-        // Case-insensitive username search
-        const user = await User.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
+        const { User: TenantUser } = await getAuthModels(req);
+        
+        // 1. Try finding in Tenant DB
+        let user = await TenantUser.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
+        
+        // 2. Fallback to Main DB (for COMPANY_ADMIN) if not found in tenant DB
+        if (!user) {
+            const MainUser = UserRegistry.getUserModel(require('mongoose').connection);
+            user = await MainUser.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') }, role: 'COMPANY_ADMIN' });
+        }
         
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
@@ -66,12 +86,13 @@ router.post('/login', async (req, res) => {
 router.post('/register-company-admin', async (req, res) => {
     const { username, password, name, email } = req.body;
     try {
-        const existing = await User.findOne({ role: 'COMPANY_ADMIN' });
+        const MainUser = UserRegistry.getUserModel(require('mongoose').connection);
+        const existing = await MainUser.findOne({ role: 'COMPANY_ADMIN' });
         if (existing && process.env.NODE_ENV === 'production') {
             return res.status(403).json({ error: 'Company Admin already exists' });
         }
 
-        const user = new User({
+        const user = new MainUser({
             username,
             password,
             name,
@@ -98,6 +119,21 @@ router.get('/institutions-public', async (req, res) => {
     }
 });
 
+// @route   GET api/auth/batches-public/:institutionId
+// @desc    Get all batches for a specific institution for registration dropdown
+router.get('/batches-public/:institutionId', async (req, res) => {
+    try {
+        const inst = await Institution.findById(req.params.institutionId);
+        if (!inst || !inst.slug) return res.status(404).json({ error: 'Institution not found' });
+        
+        const models = await getTenantModels(inst.slug);
+        const batches = await models.Batch.find({ institutionId: req.params.institutionId }, 'name batchId department');
+        res.json(batches);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // @route   POST api/auth/register
 // @desc    Register Student or Faculty
 router.post('/register', async (req, res) => {
@@ -109,16 +145,17 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Registration is only allowed for Students, Faculty, and HODs' });
         }
 
+        // Check institution exists and get slug
+        const inst = await Institution.findById(institutionId);
+        if (!inst) return res.status(400).json({ error: 'Invalid Institution' });
+
+        const models = await getTenantModels(inst.slug);
+        const User = models.User;
+
         // Check if user already exists
         let user = await User.findOne({ username });
         if (user) {
             return res.status(400).json({ error: 'Username already taken' });
-        }
-
-        // Check institution exists
-        if (institutionId) {
-            const inst = await Institution.findById(institutionId);
-            if (!inst) return res.status(400).json({ error: 'Invalid Institution' });
         }
 
         user = new User({
@@ -133,6 +170,24 @@ router.post('/register', async (req, res) => {
         });
 
         await user.save();
+
+        // 2. IMPORTANT: Also save to Main DB for login routing
+        const MainUser = UserRegistry.getUserModel(require('mongoose').connection);
+        const existingMain = await MainUser.findOne({ username });
+        if (!existingMain) {
+            const mainUser = new MainUser({
+                username,
+                password,
+                name,
+                email,
+                role,
+                institutionId,
+                batch,
+                department
+            });
+            await mainUser.save();
+        }
+
         res.status(201).json({ message: 'User registered successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });

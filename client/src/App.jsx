@@ -14,6 +14,41 @@ import JobPortal from './JobPortal';
 import Register from './Register';
 import Chatbot from './components/Chatbot';
 
+// Simple Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '50px', textAlign: 'center', fontFamily: 'sans-serif' }}>
+          <h2 style={{ color: '#e53e3e' }}>Something went wrong.</h2>
+          <p>The application encountered an error. Please try refreshing the page.</p>
+          <pre style={{ textAlign: 'left', background: '#f7fafc', padding: '20px', borderRadius: '8px', overflow: 'auto', display: 'inline-block', maxWidth: '100%' }}>
+            {this.state.error?.toString()}
+          </pre>
+          <br/>
+          <button 
+            onClick={() => { localStorage.clear(); window.location.reload(); }}
+            style={{ marginTop: '20px', padding: '10px 20px', background: '#4c51bf', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+          >
+            Clear Cache & Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const [section, setSection] = useState('timetable'); // 'timetable', 'lms', or 'attendance'
   const [activeTab, setActiveTab] = useState('admin');
@@ -55,9 +90,10 @@ function App() {
   };
 
   const selectCollege = (id, name) => {
+    const collegeObj = { id, name };
     localStorage.setItem('viewingInstitutionId', id);
     localStorage.setItem('viewingInstitutionName', name);
-    setViewingCollege({ id, name });
+    setViewingCollege(collegeObj);
     setViewMode('hod');
     setSection('timetable');
     setActiveTab('admin');
@@ -94,7 +130,7 @@ function App() {
   const timetableTabs = [
     { id: 'company', label: '🏢 Institutions', component: CompanyPortal, roles: ['COMPANY_ADMIN'], section: 'timetable' },
     { id: 'admin', label: '👨‍💼 Admin Dashboard', component: AdminPortal, roles: ['hod'], section: 'timetable' },
-    { id: 'upload', label: '📊 Data Upload', component: ExcelUpload, roles: ['hod'], section: 'timetable' },
+    { id: 'upload', label: '📊 Data Upload', component: ExcelUpload, roles: ['hod', 'faculty'], section: 'timetable' },
     { id: 'config', label: '⚙️ Config', component: TimetableConfig, roles: ['hod'], section: 'timetable' },
     { id: 'faculty-list', label: '🧑‍🏫 Faculty', component: FacultyAvailability, roles: ['hod'], section: 'timetable' },
     { id: 'elective', label: '🧩 Electives', component: ElectiveGrouping, roles: ['hod'], section: 'timetable' },
@@ -139,7 +175,8 @@ function App() {
   const ActiveComponent = [...timetableTabs, ...lmsTabs, ...attendanceTabs, ...jobTabs].find(tab => tab.id === currentTabId)?.component || (() => <div style={{padding: 40}}>Unauthorized or No Section Selected</div>);
 
   return (
-    <div className="min-h-screen" style={{ background: '#f0f2f5', fontFamily: "'Inter', sans-serif" }}>
+    <ErrorBoundary>
+      <div className="min-h-screen" style={{ background: '#f0f2f5', fontFamily: "'Inter', sans-serif" }}>
       {/* Top Main Navigation */}
       <nav style={{
         background: viewingCollege ? '#1a202c' : 'linear-gradient(135deg, #4c51bf 0%, #667eea 100%)',
@@ -153,7 +190,7 @@ function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '70px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '30px' }}>
               <h1 style={{ fontSize: '20px', fontWeight: '800', letterSpacing: '-0.5px' }}>
-                {user.role === 'COMPANY_ADMIN' && !viewingCollege ? '🏢 COMPANY ADMIN' : (viewingCollege ? viewingCollege.name.toUpperCase() : 'PORTAL')}
+                {user.role === 'COMPANY_ADMIN' && !viewingCollege ? '🏢 COMPANY ADMIN' : (viewingCollege && viewingCollege.name ? viewingCollege.name.toUpperCase() : 'PORTAL')}
               </h1>
               
               {(viewingCollege || user.role !== 'COMPANY_ADMIN') && (
@@ -272,7 +309,7 @@ function App() {
       {/* Main Content Area */}
       <main style={{ padding: '20px' }}>
         <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minHeight: 'calc(100vh - 200px)' }}>
-            <ActiveComponent user={user} onSelectCollege={selectCollege} viewingAs={viewMode} setIsQuizMode={setIsQuizMode} />
+            <ActiveComponent user={user} onSelectCollege={selectCollege} viewingAs={viewMode} role={viewMode} setIsQuizMode={setIsQuizMode} />
         </div>
       </main>
       
@@ -281,7 +318,8 @@ function App() {
       <footer style={{ textAlign: 'center', padding: '40px 20px', color: '#a0aec0', fontSize: '14px' }}>
         &copy; 2026 Admin Pro Scheduler & LMS. All rights reserved.
       </footer>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
 

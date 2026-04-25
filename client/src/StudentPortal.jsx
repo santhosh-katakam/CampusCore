@@ -44,13 +44,12 @@ function StudentPortal() {
             setBatches(res.data);
             setFilteredBatches(res.data);
 
-            // Extract unique degrees/departments for the dropdown
+            // Extract unique degrees/departments/branches for the dropdown
             const uniqueDegrees = [...new Set(res.data.flatMap(b => {
                 const terms = [];
                 if (b.degree) terms.push(b.degree);
                 if (b.department) terms.push(b.department);
-                // Also parse "Engineering" from "1st Year - CSE - A" legacy names if needed, 
-                // but better to rely on fields.
+                if (b.branch) terms.push(b.branch);
                 return terms;
             }).filter(Boolean))].sort();
 
@@ -78,6 +77,7 @@ function StudentPortal() {
             filtered = filtered.filter(b =>
                 (b.department && b.department.toLowerCase() === selectedDegree.toLowerCase()) ||
                 (b.degree && b.degree.toLowerCase() === selectedDegree.toLowerCase()) ||
+                (b.branch && b.branch.toLowerCase() === selectedDegree.toLowerCase()) ||
                 (b.name && b.name.toLowerCase().includes(selectedDegree.toLowerCase()))
             );
         }
@@ -85,6 +85,10 @@ function StudentPortal() {
         if (selectedYear) {
             const selYearNum = parseInt(selectedYear);
             filtered = filtered.filter(b => {
+                // Priority 0: Check computedYear from backend (e.g. "2nd Year")
+                const selYearLabel = selYearNum === 1 ? '1st Year' : selYearNum === 2 ? '2nd Year' : selYearNum === 3 ? '3rd Year' : '4th Year';
+                if (b.computedYear === selYearLabel) return true;
+
                 // Priority 1: Check yearNumber (Number)
                 if (b.yearNumber === selYearNum) return true;
 
@@ -113,7 +117,7 @@ function StudentPortal() {
 
         if (searchTerm) {
             filtered = filtered.filter(b =>
-                b.name.toLowerCase().includes(searchTerm.toLowerCase())
+                (b.name && b.name.toLowerCase().includes(searchTerm.toLowerCase()))
             );
         }
 
@@ -432,4 +436,3 @@ function StudentPortal() {
 }
 
 export default StudentPortal;
-

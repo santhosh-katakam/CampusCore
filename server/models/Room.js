@@ -9,4 +9,8 @@ const RoomSchema = new mongoose.Schema({
   sessionYear: String
 });
 
-module.exports = mongoose.model('Room', RoomSchema);
+const getRoomModel = (connection) => {
+  return connection.models.Room || connection.model('Room', RoomSchema);
+};
+
+module.exports = { RoomSchema, getRoomModel };
