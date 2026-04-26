@@ -19,7 +19,9 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
     const [mySubmissions, setMySubmissions] = useState([]);
     const [myQuizResults, setMyQuizResults] = useState([]);
     const [quizResults, setQuizResults] = useState([]); // For faculty viewing all results of a quiz
+    const [studentStats, setStudentStats] = useState([]); // For course-specific student progress
     const [activeQuizId, setActiveQuizId] = useState(null);
+
 
     useEffect(() => {
         if (setIsQuizMode) {
@@ -167,7 +169,26 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
         }
     };
 
+    useEffect(() => {
+        if (subTab === 'students' && activeCourse && (viewingAs === 'hod' || viewingAs === 'faculty')) {
+            fetchStudentStats(activeCourse._id);
+        }
+    }, [subTab, activeCourse, viewingAs]);
+
+    const fetchStudentStats = async (courseId) => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await api.get(`/lms/courses/${courseId}/student-stats`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setStudentStats(res.data);
+        } catch (err) {
+            console.error('Error fetching student stats:', err);
+        }
+    };
+
     const fetchCourseDetail = async (id) => {
+
         try {
             const token = localStorage.getItem('token');
             const res = await axios.get(`/lms/courses/${id}`, {
@@ -620,7 +641,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
             {view === 'list' && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
                     {courses.map(course => {
-                        const isEnrolled = course.students?.some(s => s._id === user.id);
+                        const isEnrolled = course.students?.some(s => (s._id?.toString() || s.toString()) === user.id?.toString());
                         return (
                             <div 
                                 key={course._id} 
@@ -629,33 +650,13 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                     <div style={{ color: '#4c51bf', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}>{course.category || 'General'}</div>
-                                    {viewingAs === 'student' && (
-                                        <span style={{ 
-                                            background: isEnrolled ? '#def7ec' : '#fef3c7', 
-                                            color: isEnrolled ? '#03543f' : '#92400e', 
-                                            padding: '2px 8px', 
-                                            borderRadius: '10px', 
-                                            fontSize: '10px', 
-                                            fontWeight: 'bold' 
-                                        }}>
-                                            {isEnrolled ? '✓ Enrolled' : 'Not Enrolled'}
-                                        </span>
-                                    )}
+
                                 </div>
                                 <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#1a202c' }}>{course.title}</h3>
                                 <p style={{ color: '#718096', fontSize: '14px', marginBottom: '15px', height: '40px', overflow: 'hidden' }}>{course.description}</p>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#a0aec0' }}>
                                     <span>Faculty: {course.facultyId?.name}</span>
-                                    {viewingAs === 'student' && !isEnrolled ? (
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); enrollStudent(user.id, course._id); }}
-                                            style={{ background: '#4c51bf', color: 'white', border: 'none', padding: '5px 12px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
-                                        >
-                                            Enroll Now
-                                        </button>
-                                    ) : (
-                                        <span>{course.modules?.length || 0} Modules</span>
-                                    )}
+                                    <span>{course.modules?.length || 0} Modules</span>
                                 </div>
                             </div>
                         );
@@ -742,22 +743,8 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
 
                     {/* Main Content Area */}
                     <div style={{ background: 'white', padding: '30px', borderRadius: '15px', border: '1px solid #e2e8f0', minHeight: '600px', position: 'relative' }}>
-                        {viewingAs === 'student' && !activeCourse.students?.some(s => s._id === user.id) ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', padding: '40px' }}>
-                                <div style={{ fontSize: '64px', marginBottom: '20px' }}>🔒</div>
-                                <h3 style={{ fontSize: '24px', color: '#2d3748', marginBottom: '10px' }}>Enrollment Required</h3>
-                                <p style={{ color: '#718096', maxWidth: '400px', marginBottom: '30px' }}>
-                                    Content for this course is restricted. Please enroll to access modules, materials, assignments, and quizzes.
-                                </p>
-                                <button 
-                                    onClick={() => enrollStudent(user.id)}
-                                    style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '15px 40px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '18px', cursor: 'pointer', boxShadow: '0 8px 15px rgba(102, 126, 234, 0.4)' }}
-                                >
-                                    Enroll in Course
-                                </button>
-                            </div>
-                        ) : (
-                            <>
+
+
                                 <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #edf2f7', marginBottom: '30px' }}>
                             {['Content', 'Assignments', 'Quizzes', ...(viewingAs !== 'student' ? ['Students'] : []), ...(gradingSubmission || activeAssignment ? ['Submissions'] : []), ...(activeQuizId ? ['Quiz Results'] : [])].map(tab => (
                                 <div 
@@ -868,8 +855,38 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                                                 <span style={{ fontSize: '20px' }}>📝</span>
                                                                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                                                                     <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#c05621' }}>{asn.title}</span>
-                                                                    <span style={{ fontSize: '11px', color: '#dd6b20' }}>Assignment • Due: {new Date(asn.dueDate).toLocaleDateString()}</span>
+                                                                    {asn.description && <p style={{ fontSize: '12px', color: '#718096', margin: '2px 0 5px 0' }}>{asn.description}</p>}
+                                                                    <span style={{ fontSize: '11px', color: '#dd6b20' }}>Due: {new Date(asn.dueDate).toLocaleDateString()}</span>
+                                                                    
+                                                                    {/* Show main attachment */}
+                                                                    {(asn.attachmentUrl || asn.url) && (
+                                                                        <a 
+                                                                            href={asn.attachmentUrl || asn.url} 
+                                                                            target="_blank" 
+                                                                            rel="noreferrer"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            style={{ display: 'inline-block', fontSize: '11px', color: '#4c51bf', fontWeight: 'bold', marginTop: '8px', textDecoration: 'none', background: '#ebf8ff', padding: '4px 10px', borderRadius: '5px', border: '1px solid #bee3f8', width: 'fit-content' }}
+                                                                        >
+                                                                            📥 Download Assignment Document
+                                                                        </a>
+                                                                    )}
+
+                                                                    {/* Show additional attachments if any */}
+                                                                    {asn.attachments && asn.attachments.length > 0 && asn.attachments.map((at, ai) => (
+                                                                        <a 
+                                                                            key={ai}
+                                                                            href={at.url} 
+                                                                            target="_blank" 
+                                                                            rel="noreferrer"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            style={{ display: 'inline-block', fontSize: '11px', color: '#4c51bf', fontWeight: 'bold', marginTop: '5px', textDecoration: 'none', background: '#ebf8ff', padding: '4px 10px', borderRadius: '5px', border: '1px solid #bee3f8', width: 'fit-content' }}
+                                                                        >
+                                                                            📄 {at.title || 'View Attachment'}
+                                                                        </a>
+                                                                    ))}
                                                                 </div>
+
+
                                                             </div>
                                                             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                                                 {(viewingAs === 'hod' || viewingAs === 'faculty') && (
@@ -1306,8 +1323,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                             <div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                                     <h4 style={{ margin: 0 }}>Enrolled Students ({activeCourse.students?.length || 0})</h4>
-                                    <h4 style={{ margin: 0 }}>Students in this Course ({activeCourse.students?.length || 0})</h4>
-                                </div>
+                                                                </div>
                                 
                                 <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1322,7 +1338,7 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {activeCourse.students?.map((s, idx) => (
+                                            {studentStats.map((s, idx) => (
                                                 <tr key={idx} style={{ borderBottom: '1px solid #edf2f7' }}>
                                                     <td style={{ padding: '12px 20px' }}>
                                                         <div style={{ fontWeight: '600', fontSize: '14px' }}>{s.name}</div>
@@ -1345,8 +1361,14 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                                     </td>
                                                     <td style={{ padding: '12px 20px', textAlign: 'center', color: '#4c51bf', fontWeight: 'bold' }}>{s.loginCount || 0}</td>
                                                     <td style={{ padding: '12px 20px' }}>
-                                                        <div style={{ width: '100%', background: '#edf2f7', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                                                            <div style={{ width: '0%', background: '#4c51bf', height: '100%' }}></div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <div style={{ flex: 1, background: '#edf2f7', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
+                                                                <div style={{ width: `${s.progress || 0}%`, background: '#4c51bf', height: '100%', transition: 'width 0.5s ease' }}></div>
+                                                            </div>
+                                                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#4c51bf', minWidth: '40px' }}>{s.progress || 0}%</span>
+                                                        </div>
+                                                        <div style={{ fontSize: '10px', color: '#718096', marginTop: '4px' }}>
+                                                            {s.completedQuizzes || 0} / {s.totalQuizzes || 0} Quizzes
                                                         </div>
                                                     </td>
                                                     {(viewingAs === 'hod' || viewingAs === 'faculty') && (
@@ -1361,18 +1383,18 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                                     )}
                                                 </tr>
                                             ))}
-                                            {activeCourse.students?.length === 0 && (
+                                            {studentStats.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="4" style={{ textAlign: 'center', padding: '40px', color: '#a0aec0' }}>No students enrolled in this course yet.</td>
+                                                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#a0aec0' }}>No students found.</td>
                                                 </tr>
                                             )}
                                         </tbody>
+
                                     </table>
                                 </div>
                             </div>
                         )}
-                        </>
-                    )}
+
                 </div>
             </div>
         )}

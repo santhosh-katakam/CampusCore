@@ -21,34 +21,45 @@ const getAuthModels = async (req) => {
 // @route   POST api/auth/login
 // @desc    Authenticate user & get token
 router.post('/login', async (req, res) => {
-    const { username, password, institutionId } = req.body;
+    const { username, password } = req.body;
 
     try {
         const { User: TenantUser } = await getAuthModels(req);
+        const MainUser = UserRegistry.getUserModel(require('mongoose').connection);
         
-        // 1. Try finding in Tenant DB
+        console.log(`🔑 Login attempt for: ${username}`);
+
+        // 1. Try finding in current context (Tenant DB if header provided, Main DB otherwise)
         let user = await TenantUser.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
-        
-        // 2. Fallback to Main DB (for COMPANY_ADMIN) if not found in tenant DB
-        if (!user) {
-            const MainUser = UserRegistry.getUserModel(require('mongoose').connection);
-            user = await MainUser.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') }, role: 'COMPANY_ADMIN' });
+        let source = req.tenantSlug ? `Tenant DB (${req.tenantSlug})` : 'Main DB';
+
+        // 2. If not found and we were in a tenant context, try the Main DB as fallback
+        if (!user && req.tenantModels) {
+            console.log(`🔍 Not found in ${source}, checking Main DB...`);
+            user = await MainUser.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
+            source = 'Main DB (Fallback)';
         }
-        
+
         if (!user) {
+            console.log(`❌ User not found: ${username}`);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Compare password (trimming just in case)
+        console.log(`✅ User found in ${source}`);
+
+        // Compare password
         const isMatch = await user.comparePassword(password.trim());
         
         if (!isMatch) {
+            console.log(`❌ Password mismatch for: ${username}`);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
+        console.log(`🎉 Login successful: ${username}`);
+
         // Ensure we handle missing isActive field by defaulting to true
         if (user.isActive === false) {
-            console.log(`Account disabled: ${username}`);
+            console.log(`🚫 Account disabled: ${username}`);
             return res.status(403).json({ error: 'Account is disabled' });
         }
 
@@ -58,6 +69,7 @@ router.post('/login', async (req, res) => {
             institutionId: user.institutionId,
             username: user.username
         };
+
 
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
 
@@ -176,8 +188,9 @@ router.post('/register', async (req, res) => {
         const existingMain = await MainUser.findOne({ username });
         if (!existingMain) {
             const mainUser = new MainUser({
+                _id: user._id, // Use the same ID for consistency
                 username,
-                password,
+                password: user.password, // Use hashed password from above
                 name,
                 email,
                 role,
@@ -185,6 +198,7 @@ router.post('/register', async (req, res) => {
                 batch,
                 department
             });
+
             await mainUser.save();
         }
 

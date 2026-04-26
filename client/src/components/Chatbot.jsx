@@ -30,7 +30,7 @@ const Chatbot = ({ isHidden, user }) => {
         setIsTyping(true);
 
         try {
-            const res = await axios.post('/chatbot', { 
+            const res = await axios.post('/chatbot', {
                 message: input,
                 context: {
                     user: user?.name,
@@ -77,7 +77,7 @@ const Chatbot = ({ isHidden, user }) => {
                             <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#48bb78' }}></div>
                             <span style={{ fontWeight: 'bold' }}>College AI Assistant</span>
                         </div>
-                        <button 
+                        <button
                             onClick={() => setIsOpen(false)}
                             style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '20px', cursor: 'pointer', padding: '0 5px' }}
                         >
@@ -121,7 +121,7 @@ const Chatbot = ({ isHidden, user }) => {
 
                     {/* Input */}
                     <form onSubmit={handleSend} style={{ padding: '20px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '10px' }}>
-                        <input 
+                        <input
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Ask me anything..."
@@ -134,7 +134,7 @@ const Chatbot = ({ isHidden, user }) => {
                                 fontSize: '14px'
                             }}
                         />
-                        <button 
+                        <button
                             type="submit"
                             style={{
                                 backgroundColor: '#4c51bf',
@@ -157,7 +157,7 @@ const Chatbot = ({ isHidden, user }) => {
             )}
 
             {/* Toggle Button */}
-            <button 
+            <button
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
                     width: '60px',
