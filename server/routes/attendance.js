@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { getTenantModels } = require('../utils/tenantManager');
 const AttendanceRegistry = require('../models/Attendance');
@@ -10,7 +11,22 @@ const BatchRegistry = require('../models/Batch');
 const auth = require('../middleware/auth');
 
 const getAttendanceModels = async (req) => {
-    return req.tenantModels || await getTenantModels(req.tenantSlug);
+    if (req.tenantModels) return req.tenantModels;
+    if (req.tenantSlug) return await getTenantModels(req.tenantSlug);
+    
+    // Fallback: try to resolve from user's institutionId
+    const instId = getInstitutionId(req);
+    if (instId && instId !== 'undefined' && instId !== 'null') {
+        const Institution = require('../models/Institution');
+        const inst = await Institution.findById(instId);
+        if (inst && inst.slug) {
+            console.log(`🔄 getAttendanceModels: Resolved tenant ${inst.slug} from institutionId ${instId}`);
+            return await getTenantModels(inst.slug);
+        }
+    }
+    
+    console.warn('⚠️ getAttendanceModels: Failed to resolve tenant context');
+    return null;
 };
 
 // Helper: extract institution id from request
@@ -96,7 +112,7 @@ router.get('/students/:courseId', auth, async (req, res) => {
             role: 'STUDENT',
             department: course.department,
             $or: criteria
-        }).select('name username batch department');
+        }).select('_id name username batch department');
 
         res.json(students);
     } catch (err) {
@@ -104,25 +120,64 @@ router.get('/students/:courseId', auth, async (req, res) => {
     }
 });
 
+// @route   GET api/attendance/records
+// @desc    Get attendance records for a specific course, date, and session (for editing)
+router.get('/records', auth, async (req, res) => {
+    try {
+        const { Attendance } = await getAttendanceModels(req);
+        const { courseId, date, session } = req.query;
+        
+        if (!courseId || !date) {
+            return res.status(400).json({ error: 'CourseId and Date are required' });
+        }
+
+        const query = {
+            courseId: new mongoose.Types.ObjectId(courseId),
+            facultyId: new mongoose.Types.ObjectId(req.user.id || req.user._id),
+            session: session || 'Current',
+            date: {
+                $gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
+                $lte: new Date(new Date(date).setHours(23, 59, 59, 999))
+            }
+        };
+
+        const records = await Attendance.find(query);
+        res.json(records);
+    } catch (err) {
+        console.error('Fetch Records Error:', err);
+        res.status(500).json({ error: 'Server Error' });
+    }
+});
+
 router.post('/mark', auth, async (req, res) => {
     try {
         const { Attendance } = await getAttendanceModels(req);
-        const institutionId = getInstitutionId(req);
-        const { courseId, date, attendanceData } = req.body;
-        const facultyId = req.user.id;
+        let institutionId = getInstitutionId(req);
+        
+        if (!institutionId && req.user?.institutionId) {
+            institutionId = req.user.institutionId;
+        }
+
+        const { courseId, date, attendanceData, session } = req.body;
+        const facultyId = req.user.id || req.user._id;
+        const currentSession = session || 'Current';
+
+        console.log(`📝 Marking attendance: Course ${courseId}, Date ${date}, Session ${currentSession}, Count ${attendanceData.length}`);
 
         const records = attendanceData.map(item => ({
-            institutionId,
-            studentId: item.studentId,
-            facultyId,
-            courseId,
+            institutionId: new mongoose.Types.ObjectId(institutionId),
+            studentId: new mongoose.Types.ObjectId(item.studentId),
+            facultyId: new mongoose.Types.ObjectId(facultyId),
+            courseId: new mongoose.Types.ObjectId(courseId),
             date: new Date(date),
             status: item.status,
-            session: req.body.session || 'Current'
+            session: currentSession
         }));
 
+        // Delete existing records for SAME course, SAME date, and SAME session
         await Attendance.deleteMany({
-            courseId,
+            courseId: new mongoose.Types.ObjectId(courseId),
+            session: currentSession,
             date: {
                 $gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
                 $lte: new Date(new Date(date).setHours(23, 59, 59, 999))
@@ -130,18 +185,49 @@ router.post('/mark', auth, async (req, res) => {
         });
 
         const savedRecords = await Attendance.insertMany(records);
+        console.log(`✅ Saved ${savedRecords.length} records for session ${currentSession}`);
         res.status(201).json(savedRecords);
     } catch (err) {
-        res.status(500).send('Server Error');
+        console.error('Attendance Mark Error:', err);
+        res.status(500).json({ error: 'Server Error', details: err.message });
     }
 });
 
 router.get('/student/:studentId', auth, async (req, res) => {
     try {
-        const { Attendance } = await getAttendanceModels(req);
+        const { Attendance, User } = await getAttendanceModels(req);
+        if (!Attendance) return res.status(400).json({ error: 'Tenant context missing' });
+
         const { studentId } = req.params;
         const institutionId = getInstitutionId(req);
-        const records = await Attendance.find({ studentId, institutionId }).populate('courseId', 'subject courseCode');
+        
+        console.log(`🔍 [ATTENDANCE] Fetching for student: ${studentId} (User: ${req.user?.username})`);
+        
+        // --- ID MISMATCH FIX ---
+        // Some users have different IDs in Main DB vs Tenant DB.
+        // We resolve the tenant-specific ID using the username from the authenticated user.
+        let resolvedStudentId = studentId;
+        if (req.user?.username) {
+            const tenantUser = await User.findOne({ username: req.user.username });
+            if (tenantUser) {
+                resolvedStudentId = tenantUser._id;
+                console.log(`   Resolved tenant ID: ${resolvedStudentId} from username ${req.user.username}`);
+            }
+        }
+        
+        const query = { studentId: new mongoose.Types.ObjectId(resolvedStudentId) };
+        console.log(`   Query: ${JSON.stringify(query)}`);
+
+        const records = await Attendance.find(query)
+            .populate('courseId', 'subject courseCode title')
+            .sort({ date: -1 });
+        
+        console.log(`✅ Found ${records.length} records in tenant ${req.tenantSlug}`);
+        
+        // Log a sample record if exists to debug population
+        if (records.length > 0) {
+            console.log(`   Sample record: CourseID=${records[0].courseId?._id}, Subject=${records[0].courseId?.subject || records[0].courseId?.title}`);
+        }
 
         const stats = {};
         records.forEach(rec => {
@@ -205,9 +291,28 @@ router.get('/admin/report', auth, async (req, res) => {
             return res.status(403).json({ msg: 'Access denied' });
         }
         const institutionId = getInstitutionId(req);
-        const records = await Attendance.find({ institutionId })
-            .populate('courseId', 'title department')
-            .populate('studentId', 'name department');
+        const { courseId, studentId, startDate, endDate } = req.query;
+        
+        // --- DATA ISOLATION FIX ---
+        // Only show records created by this specific Faculty/HOD
+        const query = { 
+            institutionId: new mongoose.Types.ObjectId(institutionId),
+            facultyId: new mongoose.Types.ObjectId(req.user.id || req.user._id)
+        };
+        
+        if (courseId) query.courseId = new mongoose.Types.ObjectId(courseId);
+        if (studentId) query.studentId = new mongoose.Types.ObjectId(studentId);
+        if (startDate || endDate) {
+            query.date = {};
+            if (startDate) query.date.$gte = new Date(startDate);
+            if (endDate) query.date.$lte = new Date(endDate);
+        }
+
+        console.log(`📊 Fetching filtered report for faculty: ${req.user.username}`);
+
+        const records = await Attendance.find(query)
+            .populate('courseId', 'subject department courseCode')
+            .populate('studentId', 'name department username');
         res.json(records);
     } catch (err) {
         res.status(500).send('Server Error');

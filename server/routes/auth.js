@@ -55,6 +55,33 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
+        // --- AUTO-SYNC LOGIC ---
+        // If user was found in Main DB but we have a tenant context, 
+        // ensure they exist in the Tenant DB too.
+        if (source.includes('Main DB') && req.tenantModels) {
+            const { User: TenantUser } = req.tenantModels;
+            const existsInTenant = await TenantUser.findOne({ username: user.username });
+            if (!existsInTenant && user.institutionId && user.role !== 'COMPANY_ADMIN') {
+                console.log(`🔄 Auto-syncing user ${username} to Tenant DB...`);
+                const tenantUser = new TenantUser({
+                    _id: user._id,
+                    username: user.username,
+                    password: user.password, // Already hashed in Main DB
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    institutionId: user.institutionId,
+                    batch: user.batch,
+                    department: user.department,
+                    isActive: user.isActive
+                });
+                // We use password as is since it's already hashed
+                await tenantUser.save();
+                console.log(`✅ Auto-sync complete for ${username}`);
+            }
+        }
+        // -----------------------
+
         console.log(`🎉 Login successful: ${username}`);
 
         // Ensure we handle missing isActive field by defaulting to true

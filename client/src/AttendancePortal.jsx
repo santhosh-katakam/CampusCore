@@ -10,8 +10,10 @@ const AttendancePortal = ({ user, viewingAs }) => {
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [students, setStudents] = useState([]);
     const [markingDate, setMarkingDate] = useState(new Date().toISOString().split('T')[0]);
+    const [markingSession, setMarkingSession] = useState('FN'); // 'FN', 'AN', 'Session 1', etc.
     const [loading, setLoading] = useState(false);
     const [attendanceData, setAttendanceData] = useState({}); // {studentId: 'Present/Absent/Late'}
+    const [isEditingFromList, setIsEditingFromList] = useState(false);
     
     // Filter states
     const [filters, setFilters] = useState({
@@ -104,27 +106,57 @@ const AttendancePortal = ({ user, viewingAs }) => {
         }
     }, [filters.batch, courses]);
 
+    const loadExistingAttendance = async (courseId, date, session) => {
+        try {
+            const res = await axios.get(`/attendance/records?courseId=${courseId}&date=${date}&session=${session}`);
+            if (res.data && res.data.length > 0) {
+                const existing = {};
+                res.data.forEach(rec => {
+                    existing[rec.studentId] = rec.status;
+                });
+                setAttendanceData(prev => ({ ...prev, ...existing }));
+                return true;
+            }
+            return false;
+        } catch (err) {
+            console.error('Error loading existing records:', err);
+            return false;
+        }
+    };
+
     const fetchStudentsForCourse = async (courseId) => {
         try {
             setLoading(true);
-            // Get course details from our local state
             const course = courses.find(c => c._id === courseId);
             setSelectedCourse(course);
 
             const queryParams = filters.batch ? `?batch=${encodeURIComponent(filters.batch)}` : '';
             const res = await axios.get(`/attendance/students/${courseId}${queryParams}`);
-            setStudents(res.data || []);
+            const studentList = res.data || [];
+            setStudents(studentList);
             
-            // Initialize marking data
+            // Initialize with 'Present' first
             const initial = {};
-            (res.data || []).forEach(s => initial[s._id] = 'Present');
+            studentList.forEach(s => {
+                if (s._id) initial[s._id] = 'Present';
+            });
             setAttendanceData(initial);
+
+            // Then try to load existing records for today/FN
+            await loadExistingAttendance(courseId, markingDate, markingSession);
         } catch (err) {
             console.error(err);
         } finally {
             setLoading(false);
         }
     };
+
+    // Re-load attendance when date or session changes
+    useEffect(() => {
+        if (selectedCourse) {
+            loadExistingAttendance(selectedCourse._id, markingDate, markingSession);
+        }
+    }, [markingDate, markingSession]);
 
     const fetchAdminReports = async () => {
         try {
@@ -140,17 +172,27 @@ const AttendancePortal = ({ user, viewingAs }) => {
 
     const submitAttendance = async () => {
         try {
-            const data = Object.keys(attendanceData).map(sid => ({
-                studentId: sid,
-                status: attendanceData[sid]
-            }));
+            const data = Object.keys(attendanceData)
+                .filter(sid => sid && sid !== 'undefined')
+                .map(sid => ({
+                    studentId: sid,
+                    status: attendanceData[sid]
+                }));
+
+            if (data.length === 0) {
+                alert('No students selected to mark attendance.');
+                return;
+            }
+
             await axios.post('/attendance/mark', {
                 courseId: selectedCourse._id,
                 date: markingDate,
+                session: markingSession,
                 attendanceData: data
             });
             alert('Attendance marked successfully!');
-            setSelectedCourse(null);
+            // Don't clear selectedCourse, let them see the submitted list
+            await loadExistingAttendance(selectedCourse._id, markingDate, markingSession);
         } catch (err) {
             alert('Error marking attendance');
         }
@@ -192,6 +234,25 @@ const AttendancePortal = ({ user, viewingAs }) => {
         return Object.entries(groups).map(([label, counts]) => ({ 
             label, ...counts, percentage: ((counts.present + (counts.late*0.5))/counts.total * 100).toFixed(2) 
         })).sort((a,b) => b.label.localeCompare(a.label));
+    };
+
+    const getGroupedSessions = (records) => {
+        const sessions = {};
+        records.forEach(r => {
+            const dateStr = new Date(r.date).toISOString().split('T')[0];
+            const key = `${r.courseId?._id}_${dateStr}_${r.session}`;
+            if (!sessions[key]) {
+                sessions[key] = {
+                    courseId: r.courseId?._id,
+                    courseName: r.courseId?.subject || r.courseId?.title || 'Unknown',
+                    date: dateStr,
+                    session: r.session || 'Current',
+                    count: 0
+                };
+            }
+            sessions[key].count++;
+        });
+        return Object.values(sessions).sort((a,b) => b.date.localeCompare(a.date));
     };
 
     const renderStatGrid = (data) => {
@@ -291,31 +352,48 @@ const AttendancePortal = ({ user, viewingAs }) => {
     const renderStudentView = () => {
         const overall = getOverallStats(history);
         const groupedData = reportType === 'day' ? getGroupedStats(history, 'day') : reportType === 'month' ? getGroupedStats(history, 'month') : [];
+        const recentRecords = history.slice(0, 5); // Get last 5 records
 
         return (
             <div style={{ padding: '20px' }}>
                 <h2 style={{ marginBottom: '20px', color: '#2d3748' }}>My Attendance Report</h2>
                 {renderReportControls()}
 
-                {reportType === 'overall' && overall && (
-                    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '40px', textAlign: 'center', width: '100%', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                        <h3 style={{ fontSize: '24px', marginBottom: '15px', color: '#4a5568' }}>Total Attendance</h3>
-                        <div style={{ fontSize: '64px', fontWeight: '900', color: parseFloat(overall.percentage) < 75 ? '#e53e3e' : '#38a169', marginBottom: '20px' }}>
-                            {overall.percentage}%
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: '18px', color: '#718096', fontWeight: 'bold' }}>
-                            <div>Present: <span style={{color: '#38a169'}}>{overall.present}</span></div>
-                            <div>Absent: <span style={{color: '#e53e3e'}}>{overall.absent}</span></div>
-                            <div>Total: {overall.total}</div>
-                        </div>
-                    </div>
+                {reportType === 'overall' && (
+                    <>
+                        {overall ? (
+                            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '40px', textAlign: 'center', width: '100%', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: '30px' }}>
+                                <h3 style={{ fontSize: '24px', marginBottom: '15px', color: '#4a5568' }}>Total Attendance</h3>
+                                <div style={{ fontSize: '64px', fontWeight: '900', color: parseFloat(overall.percentage) < 75 ? '#e53e3e' : '#38a169', marginBottom: '20px' }}>
+                                    {overall.percentage}%
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: '18px', color: '#718096', fontWeight: 'bold' }}>
+                                    <div>Present: <span style={{color: '#38a169'}}>{overall.present}</span></div>
+                                    <div>Absent: <span style={{color: '#e53e3e'}}>{overall.absent}</span></div>
+                                    <div>Late: <span style={{color: '#dd6b27'}}>{overall.late}</span></div>
+                                    <div>Total Sessions: {overall.total}</div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '60px', background: 'white', borderRadius: '12px', border: '1px dashed #cbd5e0', color: '#718096' }}>
+                                <div style={{ fontSize: '48px', marginBottom: '15px' }}>📅</div>
+                                <h3>No Attendance Records Found</h3>
+                                <p>Your attendance has not been marked yet for this semester.</p>
+                            </div>
+                        )}
+
+                        {recentRecords.length > 0 && (
+                            <div style={{ marginTop: '30px' }}>
+                                <h3 style={{ marginBottom: '15px', color: '#4a5568' }}>Recent Activity</h3>
+                                {renderHistoryTable(recentRecords)}
+                            </div>
+                        )}
+                    </>
                 )}
                 
                 {reportType === 'course' && renderStatGrid(stats)}
                 {(reportType === 'month' || reportType === 'day') && renderStatGrid(groupedData)}
                 {reportType === 'history' && renderHistoryTable(history)}
-                
-                {history.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: '#a0aec0' }}>No attendance records found.</div>}
             </div>
         );
     };
@@ -367,14 +445,43 @@ const AttendancePortal = ({ user, viewingAs }) => {
             ) : (
                 <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <button onClick={() => setSelectedCourse(null)} style={{ background: 'none', border: 'none', color: '#4c51bf', cursor: 'pointer', fontWeight: 'bold' }}>← Back to Courses</button>
+                        <button 
+                            onClick={() => {
+                                setSelectedCourse(null);
+                                if (isEditingFromList) {
+                                    setView('edit-list');
+                                    setIsEditingFromList(false);
+                                }
+                            }} 
+                            style={{ background: 'none', border: 'none', color: '#4c51bf', cursor: 'pointer', fontWeight: 'bold' }}
+                        >
+                            ← Back {isEditingFromList ? 'to Edit List' : 'to Courses'}
+                        </button>
                         <h2 style={{ margin: 0 }}>Mark Attendance: {selectedCourse.subject} ({selectedCourse.batch})</h2>
-                        <input 
-                            type="date" 
-                            value={markingDate} 
-                            onChange={(e) => setMarkingDate(e.target.value)}
-                            style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
-                        />
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <select 
+                                value={markingSession}
+                                onChange={(e) => setMarkingSession(e.target.value)}
+                                style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
+                            >
+                                <option value="FN">Forenoon (FN)</option>
+                                <option value="AN">Afternoon (AN)</option>
+                                <option value="S1">Session 1</option>
+                                <option value="S2">Session 2</option>
+                                <option value="S3">Session 3</option>
+                                <option value="S4">Session 4</option>
+                                <option value="S5">Session 5</option>
+                                <option value="S6">Session 6</option>
+                                <option value="S7">Session 7</option>
+                                <option value="S8">Session 8</option>
+                            </select>
+                            <input 
+                                type="date" 
+                                value={markingDate} 
+                                onChange={(e) => setMarkingDate(e.target.value)}
+                                style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e0' }}
+                            />
+                        </div>
                     </div>
 
                     <div style={{ background: '#f7fafc', padding: '15px', borderRadius: '12px', marginBottom: '20px', display: 'flex', gap: '10px' }}>
@@ -514,6 +621,17 @@ const AttendancePortal = ({ user, viewingAs }) => {
                             📝 Mark Attendance
                         </button>
                         <button 
+                            onClick={() => { setView('edit-list'); fetchAdminReports(); }} 
+                            style={{ 
+                                padding: '10px 20px', background: 'transparent', border: 'none', 
+                                color: view === 'edit-list' ? '#4c51bf' : '#718096', 
+                                fontWeight: 'bold', cursor: 'pointer',
+                                borderBottom: view === 'edit-list' ? '3px solid #4c51bf' : 'none'
+                            }}
+                        >
+                            ✏️ Edit Attendance
+                        </button>
+                        <button 
                             onClick={() => { setView('hod'); fetchAdminReports(); }} 
                             style={{ 
                                 padding: '10px 20px', background: 'transparent', border: 'none', 
@@ -529,6 +647,52 @@ const AttendancePortal = ({ user, viewingAs }) => {
             )}
             {view === 'student' && renderStudentView()}
             {(view === 'faculty' || view === 'hod-mark') && renderFacultyView()}
+            {view === 'edit-list' && (
+                <div style={{ padding: '20px' }}>
+                    <h2 style={{ marginBottom: '20px' }}>Previous Attendance Sessions</h2>
+                    <p style={{ color: '#718096', marginBottom: '20px' }}>Select a session below to modify the attendance records.</p>
+                    <div style={{ display: 'grid', gap: '15px' }}>
+                        {getGroupedSessions(history).map((session, idx) => (
+                            <div key={idx} style={{ 
+                                background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0',
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                            }}>
+                                <div>
+                                    <h3 style={{ margin: '0 0 5px 0' }}>{session.courseName}</h3>
+                                    <div style={{ fontSize: '14px', color: '#718096' }}>
+                                        <span>📅 {new Date(session.date).toLocaleDateString()}</span>
+                                        <span style={{ marginLeft: '15px' }}>⏰ Session: {session.session}</span>
+                                        <span style={{ marginLeft: '15px' }}>👥 Students: {session.count}</span>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        const course = courses.find(c => c._id === session.courseId);
+                                        if (course) {
+                                            setSelectedCourse(course);
+                                            setMarkingDate(session.date.split('T')[0]);
+                                            setMarkingSession(session.session);
+                                            setIsEditingFromList(true);
+                                            setView(markView);
+                                            fetchStudentsForCourse(course._id);
+                                        } else {
+                                            alert('Course details not found. Please try again.');
+                                        }
+                                    }}
+                                    style={{ 
+                                        padding: '10px 20px', background: '#edf2f7', color: '#4c51bf', 
+                                        border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold'
+                                    }}
+                                >
+                                    Edit Records
+                                </button>
+                            </div>
+                        ))}
+                        {history.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: '#a0aec0' }}>No previous sessions found.</div>}
+                    </div>
+                </div>
+            )}
             {view === 'hod' && renderAdminView()}
             {loading && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
