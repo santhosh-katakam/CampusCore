@@ -140,15 +140,15 @@ function App() {
   ];
 
   const lmsTabs = [
-    { id: 'lms-main', label: '📚 LMS Dashboard', component: LMSPortal, roles: ['hod', 'faculty', 'student'], section: 'lms' },
+    { id: 'lms-main', label: '📚 LMS Dashboard', component: LMSPortal, roles: ['hod', 'faculty', 'student', 'COMPANY_ADMIN'], section: 'lms' },
   ];
 
   const attendanceTabs = [
-    { id: 'attendance-main', label: '📝 Attendance', component: AttendancePortal, roles: ['hod', 'faculty', 'student'], section: 'attendance' },
+    { id: 'attendance-main', label: '📝 Attendance', component: AttendancePortal, roles: ['hod', 'faculty', 'student', 'COMPANY_ADMIN'], section: 'attendance' },
   ];
 
   const jobTabs = [
-    { id: 'job-main', label: '💼 Job Board', component: JobPortal, roles: ['hod', 'faculty', 'student'], section: 'jobs' },
+    { id: 'job-main', label: '💼 Job Board', component: JobPortal, roles: ['hod', 'faculty', 'student', 'COMPANY_ADMIN'], section: 'jobs' },
   ];
 
   // Helper to determine if a tab should be shown

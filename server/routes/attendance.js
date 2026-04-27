@@ -294,11 +294,15 @@ router.get('/admin/report', auth, async (req, res) => {
         const { courseId, studentId, startDate, endDate } = req.query;
         
         // --- DATA ISOLATION FIX ---
-        // Only show records created by this specific Faculty/HOD
+        // Faculty and HODs only see records they created.
+        // Admins (College and Company) can see all records for the institution.
         const query = { 
-            institutionId: new mongoose.Types.ObjectId(institutionId),
-            facultyId: new mongoose.Types.ObjectId(req.user.id || req.user._id)
+            institutionId: new mongoose.Types.ObjectId(institutionId)
         };
+
+        if (['FACULTY', 'HOD'].includes(req.user.role)) {
+            query.facultyId = new mongoose.Types.ObjectId(req.user.id || req.user._id);
+        }
         
         if (courseId) query.courseId = new mongoose.Types.ObjectId(courseId);
         if (studentId) query.studentId = new mongoose.Types.ObjectId(studentId);
