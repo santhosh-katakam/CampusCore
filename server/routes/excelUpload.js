@@ -73,11 +73,21 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             subjects: { added: 0, updated: 0, errors: [] }
         };
 
+        const isHodOrFaculty = req.user && (req.user.role === 'HOD' || req.user.role === 'FACULTY');
+
+        // Helper to check if a sheet looks like course data
+        const isCourseSheet = (name) => {
+            const data = sheets[name];
+            if (!data || data.length === 0) return false;
+            const cols = Object.keys(data[0]).map(c => c.toLowerCase());
+            return cols.some(c => c.includes('course code')) && cols.some(c => c.includes('subject'));
+        };
+
         // Process Faculty Sheet - Try multiple possible sheet names
         const facultySheetNames = Object.keys(sheets).filter(name =>
-            name.toLowerCase().includes('faculty') ||
+            (name.toLowerCase().includes('faculty') ||
             name.toLowerCase().includes('employee') ||
-            name === 'Sheet1' // Default Excel sheet name
+            name === 'Sheet1') && !isCourseSheet(name)
         );
 
 
@@ -90,11 +100,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             const firstSheet = sheets[Object.keys(sheets)[0]];
             if (firstSheet.length > 0) {
                 const firstRow = firstSheet[0];
-                const hasEmpId = Object.keys(firstRow).some(key =>
-                    key.toLowerCase().includes('emp') || key.toLowerCase().includes('faculty id')
-                );
-                if (hasEmpId) {
-                    facultySheet = firstSheet;
+                const columns = Object.keys(firstRow);
+                
+                // Explicitly skip if it looks like course data
+                const isCourse = columns.some(c => c.toLowerCase().includes('course code')) && 
+                                columns.some(c => c.toLowerCase().includes('subject'));
+                                
+                if (!isCourse) {
+                    const hasEmpId = columns.some(key =>
+                        key.toLowerCase().includes('emp') || key.toLowerCase().includes('faculty id')
+                    );
+                    if (hasEmpId) {
+                        facultySheet = firstSheet;
+                    }
                 }
             }
         }
@@ -161,8 +179,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
         // Process Rooms Sheet - Try multiple possible sheet names
         const roomSheetNames = Object.keys(sheets).filter(name =>
-            name.toLowerCase().includes('room') ||
-            name === 'Sheet1' // Default Excel sheet name
+            (name.toLowerCase().includes('room') ||
+            name === 'Sheet1') && !isCourseSheet(name)
         );
 
 
@@ -175,11 +193,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             const firstSheet = sheets[Object.keys(sheets)[0]];
             if (firstSheet.length > 0) {
                 const firstRow = firstSheet[0];
-                const hasRoomName = Object.keys(firstRow).some(key =>
-                    key.toLowerCase().includes('room')
-                );
-                if (hasRoomName) {
-                    roomSheet = firstSheet;
+                const columns = Object.keys(firstRow);
+                
+                // Explicitly skip if it looks like course data
+                const isCourse = columns.some(c => c.toLowerCase().includes('course code')) && 
+                                columns.some(c => c.toLowerCase().includes('subject'));
+                
+                if (!isCourse) {
+                    const hasRoomName = columns.some(key =>
+                        key.toLowerCase().includes('room')
+                    );
+                    if (hasRoomName) {
+                        roomSheet = firstSheet;
+                    }
                 }
             }
         }
@@ -256,8 +282,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
         // Process Batches Sheet - Try multiple possible sheet names
         const batchSheetNames = Object.keys(sheets).filter(name =>
-            name.toLowerCase().includes('batch') ||
-            name === 'Sheet1' // Default Excel sheet name
+            (name.toLowerCase().includes('batch') ||
+            name === 'Sheet1') && !isCourseSheet(name)
         );
 
 
@@ -270,11 +296,19 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             const firstSheet = sheets[Object.keys(sheets)[0]];
             if (firstSheet.length > 0) {
                 const firstRow = firstSheet[0];
-                const hasBatch = Object.keys(firstRow).some(key =>
-                    key.toLowerCase().includes('batch') || key.toLowerCase().includes('semester')
-                );
-                if (hasBatch) {
-                    batchSheet = firstSheet;
+                const columns = Object.keys(firstRow);
+                
+                // Explicitly skip if it looks like course data
+                const isCourse = columns.some(c => c.toLowerCase().includes('course code')) && 
+                                columns.some(c => c.toLowerCase().includes('subject'));
+                
+                if (!isCourse) {
+                    const hasBatch = columns.some(key =>
+                        key.toLowerCase().includes('batch') || key.toLowerCase().includes('semester')
+                    );
+                    if (hasBatch) {
+                        batchSheet = firstSheet;
+                    }
                 }
             }
         }
@@ -451,8 +485,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                         continue;
                     }
 
-                    // Create or update Subject
-                    if (subject && courseCode) {
+                    // Create or update Subject (Only for non-HOD/Faculty)
+                    if (subject && courseCode && !isHodOrFaculty) {
                         try {
                             const existingSubject = await Subject.findOne({ code: courseCode, institutionId });
                             if (existingSubject) {
@@ -475,6 +509,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
                     // Create or update Course
                     const existing = await Course.findOne({
+                        facultyId,
                         courseCode,
                         batch,
                         semester,
