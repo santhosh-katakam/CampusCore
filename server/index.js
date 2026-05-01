@@ -24,7 +24,29 @@ connectDB();
 app.use(cors());
 app.use(express.json());
 const path = require('path');
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const fs = require('fs');
+
+// Static Files
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsDir));
+
+// Debug Route
+app.get('/debug-uploads', (req, res) => {
+    try {
+        const files = fs.readdirSync(uploadsDir);
+        res.json({ 
+            cwd: process.cwd(), 
+            __dirname, 
+            uploadsDir, 
+            exists: fs.existsSync(uploadsDir),
+            files 
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(authMiddleware);
