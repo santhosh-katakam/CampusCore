@@ -12,8 +12,13 @@ const fs = require('fs');
 
 let storage;
 
-// Check if Cloudinary credentials are provided
-if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+// Check if Cloudinary credentials are provided and NOT placeholders
+const isCloudinaryConfigured = 
+    process.env.CLOUDINARY_CLOUD_NAME && !process.env.CLOUDINARY_CLOUD_NAME.includes('your_') &&
+    process.env.CLOUDINARY_API_KEY && !process.env.CLOUDINARY_API_KEY.includes('your_') &&
+    process.env.CLOUDINARY_API_SECRET && !process.env.CLOUDINARY_API_SECRET.includes('your_');
+
+if (isCloudinaryConfigured) {
     const { CloudinaryStorage } = require('multer-storage-cloudinary');
     const cloudinary = require('cloudinary').v2;
 
@@ -50,19 +55,28 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
 const upload = multer({ storage });
 
 router.post('/upload', upload.single('file'), (req, res) => {
-    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-    
-    let fileUrl;
-    if (req.file.path.startsWith('http')) {
-        // Cloudinary path is already a URL
-        fileUrl = req.file.path;
-    } else {
-        // Local path needs to be converted to a URL
-        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-        fileUrl = `${protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    try {
+        console.log('📤 LMS Upload attempt:', req.file ? req.file.originalname : 'No file');
+        
+        if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+        
+        let fileUrl;
+        if (req.file.path && req.file.path.startsWith('http')) {
+            // Cloudinary path is already a URL
+            fileUrl = req.file.path;
+        } else {
+            // Local path needs to be converted to a URL
+            const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+            const host = req.get('host');
+            fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+        }
+        
+        console.log('✅ File uploaded successfully:', fileUrl);
+        res.json({ url: fileUrl });
+    } catch (err) {
+        console.error('❌ Upload error:', err);
+        res.status(500).json({ message: 'Internal server error during upload', error: err.message });
     }
-    
-    res.json({ url: fileUrl });
 });
 
 // @route   GET /api/lms/courses

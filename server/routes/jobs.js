@@ -13,8 +13,8 @@ const getJobModels = (req) => {
 
 // Helper to get institution ID
 const getInstitutionId = (req) => {
-    if (req.user && req.user.institutionId) return req.user.institutionId;
-    const id = req.headers['x-institution-id'];
+    let id = (req.user && req.user.institutionId) ? req.user.institutionId : req.headers['x-institution-id'];
+    
     if (!id || id === 'null' || id === 'undefined' || id === '') {
         return process.env.DEFAULT_INSTITUTION_ID;
     }
@@ -44,6 +44,10 @@ router.post('/', auth, async (req, res) => {
         const { title, company, description, location, salary, link } = req.body;
         const institutionId = getInstitutionId(req);
 
+        if (!req.user) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
         if (!['HOD', 'FACULTY', 'COLLEGE_ADMIN'].includes(req.user.role)) {
             return res.status(403).json({ error: 'Unauthorized to post jobs' });
         }
@@ -56,13 +60,16 @@ router.post('/', auth, async (req, res) => {
             salary,
             link,
             institutionId,
-            postedBy: req.user.id,
+            postedBy: req.user.id || req.user._id,
             postedByName: req.user.username
         });
 
+        console.log('📝 Saving Job:', { title, company, institutionId, postedBy: req.user.id });
         await job.save();
+        console.log('✅ Job saved successfully');
         res.json(job);
     } catch (err) {
+        console.error('❌ Error posting job:', err);
         res.status(500).json({ error: err.message });
     }
 });

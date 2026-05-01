@@ -28,3 +28,6 @@ yarn-error.log*
 
 # Uploaded files
 server/uploads/
+
+# Test scripts
+server/test_*.js

@@ -39,7 +39,8 @@ const JobPortal = ({ user }) => {
             setFormData({ title: '', company: '', description: '', location: '', salary: '', link: '' });
             fetchJobs();
         } catch (err) {
-            alert('Error posting job');
+            const msg = err.response?.data?.error || err.message || 'Error posting job';
+            alert('Error: ' + msg);
         }
     };
 
