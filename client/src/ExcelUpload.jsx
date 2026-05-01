@@ -507,7 +507,7 @@ const ExcelUpload = () => {
                 </h4>
                 <ul style={{ marginLeft: '20px', color: '#64748b', lineHeight: '1.8' }}>
                     <li>
-                        <strong>Faculty Sheet:</strong> Faculty ID, Faculty Name, Faculty Department, Faculty Email
+                        <strong>Faculty Sheet:</strong> Emp ID, Employee Name, Department, Email
                         <a href={`${api.defaults.baseURL}/excel/template/faculty`} download style={{ marginLeft: '10px', color: '#4338ca', fontSize: '13px', textDecoration: 'underline' }}>Download Faculty Template</a>
                     </li>
                     <li>
@@ -515,11 +515,11 @@ const ExcelUpload = () => {
                         <a href={`${api.defaults.baseURL}/excel/template/rooms`} download style={{ marginLeft: '10px', color: '#4338ca', fontSize: '13px', textDecoration: 'underline' }}>Download Rooms Template</a>
                     </li>
                     <li>
-                        <strong>Batches Sheet:</strong> Semester, Batch ID, Degree, Year, Department, Session
+                        <strong>Batches Sheet:</strong> Semester, Batch, Degree, Year, School/Department, Session
                         <a href={`${api.defaults.baseURL}/excel/template/batches`} download style={{ marginLeft: '10px', color: '#4338ca', fontSize: '13px', textDecoration: 'underline' }}>Download Batches Template</a>
                     </li>
                     <li>
-                        <strong>Course Data Sheets:</strong> Faculty ID, Course Code, Subject, Type, Batch, Course L/T/P, Credits, etc.
+                        <strong>Course Data Sheets:</strong> Emp ID, Faculty, Course code, Subject, Type, Batch, Course L/T/P, Credits, Year, Semester, Program, Department, Faculty L/T/P, Total Load, Session
                         <a href={`${api.defaults.baseURL}/excel/template/courses`} download style={{ marginLeft: '10px', color: '#4338ca', fontSize: '13px', textDecoration: 'underline' }}>Download Course Template</a>
                     </li>
                 </ul>

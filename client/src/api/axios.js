@@ -48,14 +48,20 @@ api.interceptors.request.use(
     }
 );
 
-// Add a response interceptor (optional, good for global error handling)
 api.interceptors.response.use(
     (response) => {
         return response;
     },
     (error) => {
         // Handle common errors (401, 403, 500) centrally if needed
-        if (error.code === 'ERR_NETWORK') {
+        if (error.response && error.response.status === 401) {
+            console.error('Unauthorized - Token expired or invalid. Logging out.');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('viewingInstitutionId');
+            localStorage.removeItem('viewingInstitutionName');
+            window.location.reload();
+        } else if (error.code === 'ERR_NETWORK') {
             console.error('Network Error: Server might be down or CORS issue.');
         }
         return Promise.reject(error);

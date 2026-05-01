@@ -107,4 +107,52 @@ router.get('/stats', async (req, res) => {
     }
 });
 
+// @route   DELETE api/company/institutions/:id
+// @desc    Delete an institution and its admin user
+router.delete('/institutions/:id', async (req, res) => {
+    try {
+        const instId = req.params.id;
+        const institution = await Institution.findById(instId);
+        
+        if (!institution) {
+            return res.status(404).json({ error: 'Institution not found' });
+        }
+
+        // 1. Delete the institution from main DB
+        await Institution.findByIdAndDelete(instId);
+        
+        // 2. Delete the associated admin user(s)
+        await MainUser.deleteMany({ institutionId: instId });
+
+        res.json({ message: 'Institution deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// @route   PUT api/company/institutions/:id/reset-password
+// @desc    Reset password for an institution's admin
+router.put('/institutions/:id/reset-password', async (req, res) => {
+    try {
+        const instId = req.params.id;
+        const { newPassword } = req.body;
+
+        if (!newPassword) {
+            return res.status(400).json({ error: 'New password is required' });
+        }
+
+        const admin = await MainUser.findOne({ institutionId: instId, role: 'COLLEGE_ADMIN' });
+        if (!admin) {
+            return res.status(404).json({ error: 'Admin user not found' });
+        }
+
+        admin.password = newPassword;
+        await admin.save(); // Assuming save() triggers the password hashing pre-hook
+
+        res.json({ message: 'Password reset successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;

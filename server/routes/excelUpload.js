@@ -605,7 +605,7 @@ const sendSingleSheetTemplate = (res, data, sheetName, filename) => {
 
 // 1. Faculty Template
 router.get('/template/faculty', (req, res) => {
-    const data = [{ "Faculty ID": "FAC001", "Faculty Name": "Dr. John Doe", "Faculty Department": "Computer Science", "Faculty Email": "john.doe@university.edu" }];
+    const data = [{ "Emp ID": "FAC001", "Employee Name": "Dr. John Doe", "Department": "Computer Science", "Email": "john.doe@university.edu" }];
     sendSingleSheetTemplate(res, data, "Faculty", "faculty_template.xlsx");
 });
 
@@ -617,16 +617,16 @@ router.get('/template/rooms', (req, res) => {
 
 // 3. Batches Template
 router.get('/template/batches', (req, res) => {
-    const data = [{ "Batch ID": "CSE-A", "Semester": "V", "Degree": "B.Tech", "Year": "Third Year", "Department": "CSE", "Session": "2024-25" }];
+    const data = [{ "Semester": "V", "Batch": "CSE-A", "Degree": "B.Tech", "Year": "Third Year", "School/Department": "CSE", "Session": "2024-25" }];
     sendSingleSheetTemplate(res, data, "Batches", "batches_template.xlsx");
 });
 
 // 4. Course Data Template
 router.get('/template/courses', (req, res) => {
     const data = [{ 
-        "Faculty ID": "FAC001", "Faculty Name": "Dr. John Doe", "Course Code": "CS301", "Subject": "Data Structures", 
-        "Type": "Core", "Batch": "CSE-A", "Course L": 3, "Course T": 1, "Course P": 0, "Credits": 4, 
-                "Semester": "V", "Program": "B.Tech", "Department": "CSE", "Session": "2024-25" 
+        "Emp ID": "2500CS0002", "Faculty": "Mada Mounika", "Course code": "25CAI314PC102", "Subject": "Problem Solving using Python Programming", 
+        "Type": "Core", "Batch": "2025-2029", "Course L": 0, "Course T": 0, "Course P": 6, "Credits": 5, 
+        "Year": "First", "Semester": "II", "Program": "BTECH", "Department": "CSE", "Faculty L": 3, "Faculty T": 1, "Faculty P": 4, "Total Load": 6, "Session": "2025-26-even" 
     }];
     sendSingleSheetTemplate(res, data, "Course Data", "courses_template.xlsx");
 });
@@ -637,7 +637,7 @@ router.get('/template', (req, res) => {
         const workbook = XLSX.utils.book_new();
 
         // Faculty
-        const facultyData = [{ "Faculty ID": "FAC001", "Faculty Name": "Dr. John Doe", "Faculty Department": "Computer Science", "Faculty Email": "john.doe@university.edu" }];
+        const facultyData = [{ "Emp ID": "FAC001", "Employee Name": "Dr. John Doe", "Department": "Computer Science", "Email": "john.doe@university.edu" }];
         XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(facultyData), "Faculty");
 
         // Rooms
@@ -645,14 +645,14 @@ router.get('/template', (req, res) => {
         XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(roomData), "Rooms");
 
         // Batches
-        const batchData = [{ "Batch ID": "CSE-A", "Semester": "V", "Degree": "B.Tech", "Year": "Third Year", "Department": "CSE", "Session": "2024-25" }];
+        const batchData = [{ "Semester": "V", "Batch": "CSE-A", "Degree": "B.Tech", "Year": "Third Year", "School/Department": "CSE", "Session": "2024-25" }];
         XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(batchData), "Batches");
 
         // Course Data
         const courseData = [{ 
-            "Faculty ID": "FAC001", "Faculty Name": "Dr. John Doe", "Course Code": "CS301", "Subject": "Data Structures", 
-            "Type": "Core", "Batch": "CSE-A", "Course L": 3, "Course T": 1, "Course P": 0, "Credits": 4, 
-            "Semester": "V", "Program": "B.Tech", "Department": "CSE", "Session": "2024-25" 
+            "Emp ID": "2500CS0002", "Faculty": "Mada Mounika", "Course code": "25CAI314PC102", "Subject": "Problem Solving using Python Programming", 
+            "Type": "Core", "Batch": "2025-2029", "Course L": 0, "Course T": 0, "Course P": 6, "Credits": 5, 
+            "Year": "First", "Semester": "II", "Program": "BTECH", "Department": "CSE", "Faculty L": 3, "Faculty T": 1, "Faculty P": 4, "Total Load": 6, "Session": "2025-26-even" 
         }];
         XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(courseData), "Course Data");
 

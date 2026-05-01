@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const Timetable = require('../models/Timetable');
+const TimetableRegistry = require('../models/Timetable');
+const mongoose = require('mongoose');
 const Scheduler = require('../utils/scheduler');
 
 // Simple helper to parse the comma-separated strings
@@ -11,6 +12,8 @@ const parseList = (str) => {
 
 router.post('/', async (req, res) => {
     try {
+        const Timetable = req.tenantModels ? req.tenantModels.Timetable : TimetableRegistry.getTimetableModel(mongoose.connection);
+
         if (req.body.isParsedData) {
             // Highly robust parsed data from frontend prompt
             const { batches, lectureRooms, labRooms, subjectConfig } = req.body;
@@ -40,7 +43,7 @@ router.post('/', async (req, res) => {
                 });
             }
 
-            const instId = process.env.DEFAULT_INSTITUTION_ID || '69884fc9b7b03d132ba7f832';
+            const instId = req.headers['x-institution-id'] || req.user?.institutionId || process.env.DEFAULT_INSTITUTION_ID || '69884fc9b7b03d132ba7f832';
             const scheduler = new Scheduler(config, roomConfigObj, [], instId, {});
             const results = scheduler.generateMulti(batchesData);
 
@@ -149,7 +152,7 @@ router.post('/', async (req, res) => {
         }
 
         // Generate timetable using same Scheduler!
-        const instId = process.env.DEFAULT_INSTITUTION_ID || '69884fc9b7b03d132ba7f832';
+        const instId = req.headers['x-institution-id'] || req.user?.institutionId || process.env.DEFAULT_INSTITUTION_ID || '69884fc9b7b03d132ba7f832';
         const scheduler = new Scheduler(config, roomConfig, [], instId, {});
         const results = scheduler.generateMulti(batchesData);
 
