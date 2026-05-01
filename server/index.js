@@ -59,6 +59,20 @@ app.use('/api/lms', lmsRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.get('/api/debug-uploads', (req, res) => {
+    try {
+        const files = fs.readdirSync(uploadsDir);
+        res.json({ 
+            cwd: process.cwd(), 
+            __dirname, 
+            uploadsDir, 
+            exists: fs.existsSync(uploadsDir),
+            files 
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 app.use('/api', api);
 
 const PORT = process.env.PORT || 4000;
