@@ -10,23 +10,58 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Configure multer
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const dir = path.join(__dirname, '../uploads');
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
-});
+let storage;
+
+// Check if Cloudinary credentials are provided
+if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+    const { CloudinaryStorage } = require('multer-storage-cloudinary');
+    const cloudinary = require('cloudinary').v2;
+
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+
+    storage = new CloudinaryStorage({
+        cloudinary,
+        params: {
+            folder: 'campuscore_uploads',
+            allowed_formats: ['pdf', 'doc', 'docx', 'txt', 'png', 'jpg', 'jpeg'],
+            resource_type: 'auto'
+        }
+    });
+    console.log('✅ LMS: Using Cloudinary Storage');
+} else {
+    // Fallback to local disk storage
+    storage = multer.diskStorage({
+        destination: (req, file, cb) => {
+            const dir = path.join(__dirname, '../uploads');
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            cb(null, dir);
+        },
+        filename: (req, file, cb) => {
+            cb(null, Date.now() + path.extname(file.originalname));
+        }
+    });
+    console.log('⚠️ LMS: Cloudinary credentials missing, using local Disk Storage');
+}
+
 const upload = multer({ storage });
 
 router.post('/upload', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const fileUrl = `${protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    
+    let fileUrl;
+    if (req.file.path.startsWith('http')) {
+        // Cloudinary path is already a URL
+        fileUrl = req.file.path;
+    } else {
+        // Local path needs to be converted to a URL
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+        fileUrl = `${protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    }
+    
     res.json({ url: fileUrl });
 });
 
