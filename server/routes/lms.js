@@ -13,8 +13,8 @@ const fs = require('fs');
 // Configure multer
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const dir = 'uploads';
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+        const dir = path.join(__dirname, '../uploads');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         cb(null, dir);
     },
     filename: (req, file, cb) => {
@@ -25,7 +25,7 @@ const upload = multer({ storage });
 
 router.post('/upload', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-    const fileUrl = `http://localhost:4000/uploads/${req.file.filename}`;
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
     res.json({ url: fileUrl });
 });
 

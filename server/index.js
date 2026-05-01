@@ -23,7 +23,8 @@ connectDB();
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(authMiddleware);
