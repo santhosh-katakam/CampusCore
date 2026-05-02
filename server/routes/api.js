@@ -566,11 +566,13 @@ router.post('/generate', async (req, res) => {
       const bName = (batchNames && batchNames[idx]) ? batchNames[idx] : (b.name || b.batchId || b._id.toString());
       b.batchId = bName; // temporary set for scheduler
 
+      const finalConf = (batchConfigs && (batchConfigs[b._id.toString()] || batchConfigs[b.batchId])) || subjectConfig;
+
       return {
         batch: b,
         // If batchConfigs was provided, use the specific one. 
         // Otherwise, or if it's missing, fall back to the main subjectConfig from req.body
-        subjectConfig: (batchConfigs && (batchConfigs[b._id.toString()] || batchConfigs[b.batchId])) || subjectConfig
+        subjectConfig: finalConf
       };
     });
 

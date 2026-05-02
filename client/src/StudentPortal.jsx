@@ -9,7 +9,6 @@ function StudentPortal() {
     const [selectedYear, setSelectedYear] = useState('');
     const [selectedBatch, setSelectedBatch] = useState('');
 
-    const [filteredBatches, setFilteredBatches] = useState([]);
     const [timetable, setTimetable] = useState(null);
     const [loading, setLoading] = useState(false);
 
@@ -24,38 +23,103 @@ function StudentPortal() {
         { id: 8, label: "4:00 - 5:00" },
     ];
 
-    const [degrees, setDegrees] = useState(['Engineering', 'Arts', 'Science', 'Commerce']); // Default, will update dynamically
     const years = [1, 2, 3, 4];
 
     const [searchTerm, setSearchTerm] = useState('');
+
+    const degrees = React.useMemo(() => {
+        if (!batches || batches.length === 0) return [];
+        const unique = [...new Set(batches.flatMap(b => {
+            const terms = [];
+            if (b.degree) terms.push(String(b.degree).trim());
+            if (b.department) terms.push(String(b.department).trim());
+            if (b.branch) terms.push(String(b.branch).trim());
+            return terms;
+        }).filter(Boolean))].sort();
+        return unique;
+    }, [batches]);
+
+    const hasDegreeMetadata = React.useMemo(() => degrees.length > 0, [degrees]);
+
+    const parseSemesterNumber = (semester) => {
+        if (semester === null || semester === undefined) return null;
+        const raw = String(semester).trim().toUpperCase();
+        const romanMap = {
+            I: 1, II: 2, III: 3, IV: 4,
+            V: 5, VI: 6, VII: 7, VIII: 8,
+        };
+        if (romanMap[raw]) return romanMap[raw];
+        const numeric = Number.parseInt(raw, 10);
+        return Number.isFinite(numeric) ? numeric : null;
+    };
+
+    const getBatchYearNumber = (batch) => {
+        const numericYearCandidates = [batch?.yearNumber, batch?.year];
+        for (const candidate of numericYearCandidates) {
+            const parsed = Number.parseInt(candidate, 10);
+            if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 6) return parsed;
+        }
+
+        const text = [
+            batch?.computedYear,
+            batch?.yearLabel,
+            batch?.name,
+            batch?.batchId,
+        ].map(v => String(v || '').toLowerCase()).join(' ');
+
+        if (/(^|\s)(first|1st|year\s*1|1\s*year)(\s|$)/.test(text)) return 1;
+        if (/(^|\s)(second|2nd|year\s*2|2\s*year)(\s|$)/.test(text)) return 2;
+        if (/(^|\s)(third|3rd|year\s*3|3\s*year)(\s|$)/.test(text)) return 3;
+        if (/(^|\s)(fourth|4th|year\s*4|4\s*year)(\s|$)/.test(text)) return 4;
+
+        const semesterNumber = parseSemesterNumber(batch?.semester);
+        if (semesterNumber && semesterNumber > 0) return Math.ceil(semesterNumber / 2);
+        return null;
+    };
+
+    const filteredBatches = React.useMemo(() => {
+        if (!batches || batches.length === 0) return [];
+
+        let filtered = [...batches];
+
+        if (selectedDegree && hasDegreeMetadata) {
+            const d = String(selectedDegree).toLowerCase().replace(/[-\s]/g, "");
+            filtered = filtered.filter(b => {
+                const dep = String(b.department || "").toLowerCase().replace(/[-\s]/g, "");
+                const deg = String(b.degree || "").toLowerCase().replace(/[-\s]/g, "");
+                const bra = String(b.branch || "").toLowerCase().replace(/[-\s]/g, "");
+                const nam = String(b.name || "").toLowerCase().replace(/[-\s]/g, "");
+                const bid = String(b.batchId || "").toLowerCase().replace(/[-\s]/g, "");
+                return dep.includes(d) || deg.includes(d) || bra.includes(d) || nam.includes(d) || bid.includes(d);
+            });
+        }
+
+        if (selectedYear) {
+            const selYearNum = parseInt(selectedYear);
+            if (!isNaN(selYearNum)) {
+                filtered = filtered.filter(b => getBatchYearNumber(b) === selYearNum);
+            }
+        }
+
+        if (searchTerm) {
+            const s = String(searchTerm).toLowerCase().trim();
+            filtered = filtered.filter(b =>
+                String(b.name || "").toLowerCase().includes(s)
+            );
+        }
+
+        return filtered;
+    }, [batches, selectedDegree, selectedYear, searchTerm, hasDegreeMetadata]);
 
     useEffect(() => {
         fetchBatches();
         fetchAllTimetables();
     }, []);
 
-    useEffect(() => {
-        filterBatches();
-    }, [selectedDegree, selectedYear, batches, searchTerm]);
-
     const fetchBatches = async () => {
         try {
             const res = await api.get('/batches');
             setBatches(res.data);
-            setFilteredBatches(res.data);
-
-            // Extract unique degrees/departments/branches for the dropdown
-            const uniqueDegrees = [...new Set(res.data.flatMap(b => {
-                const terms = [];
-                if (b.degree) terms.push(b.degree);
-                if (b.department) terms.push(b.department);
-                if (b.branch) terms.push(b.branch);
-                return terms;
-            }).filter(Boolean))].sort();
-
-            if (uniqueDegrees.length > 0) {
-                setDegrees(uniqueDegrees);
-            }
         } catch (err) {
             console.error(err);
         }
@@ -70,59 +134,6 @@ function StudentPortal() {
         }
     };
 
-    const filterBatches = () => {
-        let filtered = batches;
-
-        if (selectedDegree) {
-            filtered = filtered.filter(b =>
-                (b.department && b.department.toLowerCase() === selectedDegree.toLowerCase()) ||
-                (b.degree && b.degree.toLowerCase() === selectedDegree.toLowerCase()) ||
-                (b.branch && b.branch.toLowerCase() === selectedDegree.toLowerCase()) ||
-                (b.name && b.name.toLowerCase().includes(selectedDegree.toLowerCase()))
-            );
-        }
-
-        if (selectedYear) {
-            const selYearNum = parseInt(selectedYear);
-            filtered = filtered.filter(b => {
-                // Priority 0: Check computedYear from backend (e.g. "2nd Year")
-                const selYearLabel = selYearNum === 1 ? '1st Year' : selYearNum === 2 ? '2nd Year' : selYearNum === 3 ? '3rd Year' : '4th Year';
-                if (b.computedYear === selYearLabel) return true;
-
-                // Priority 1: Check yearNumber (Number)
-                if (b.yearNumber === selYearNum) return true;
-
-                // Priority 2: Check year (String/Number) loosely
-                if (b.year == selYearNum) return true;
-
-                // Priority 3: Parse "Third", "3rd", etc. from year string
-                const yStr = (b.year || "").toLowerCase();
-                const nameStr = (b.name || "").toLowerCase();
-
-                // Check year field
-                if (selYearNum === 1 && (yStr.includes("first") || yStr.includes("1st"))) return true;
-                if (selYearNum === 2 && (yStr.includes("second") || yStr.includes("2nd"))) return true;
-                if (selYearNum === 3 && (yStr.includes("third") || yStr.includes("3rd"))) return true;
-                if (selYearNum === 4 && (yStr.includes("fourth") || yStr.includes("4th"))) return true;
-
-                // Fallback: Check Name (e.g. "1st Year...") if year field is missing/bad
-                if (selYearNum === 1 && (nameStr.includes("1st year") || nameStr.includes("first year"))) return true;
-                if (selYearNum === 2 && (nameStr.includes("2nd year") || nameStr.includes("second year"))) return true;
-                if (selYearNum === 3 && (nameStr.includes("3rd year") || nameStr.includes("third year"))) return true;
-                if (selYearNum === 4 && (nameStr.includes("4th year") || nameStr.includes("fourth year"))) return true;
-
-                return false;
-            });
-        }
-
-        if (searchTerm) {
-            filtered = filtered.filter(b =>
-                (b.name && b.name.toLowerCase().includes(searchTerm.toLowerCase()))
-            );
-        }
-
-        setFilteredBatches(filtered);
-    };
 
     const handleSearch = () => {
         if (!selectedBatch) {
@@ -245,6 +256,7 @@ function StudentPortal() {
                                     setSelectedDegree(e.target.value);
                                     setSelectedBatch('');
                                 }}
+                                disabled={!hasDegreeMetadata}
                                 className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
                             >
                                 <option value="">All Degrees</option>

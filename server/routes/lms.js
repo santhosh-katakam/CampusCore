@@ -425,6 +425,15 @@ router.post('/quiz-results', auth, async (req, res) => {
     try {
         const { QuizResult } = await getLMSModels(req);
         const resolvedStudentId = await resolveTenantUserId(req, req.user.id);
+
+        const existingResult = await QuizResult.findOne({
+            quizId: req.body.quizId,
+            studentId: resolvedStudentId
+        });
+        if (existingResult) {
+            return res.status(409).json({ message: 'Quiz already attempted. Retake is not allowed.' });
+        }
+
         const newResult = new QuizResult({
             ...req.body,
             studentId: resolvedStudentId
@@ -494,7 +503,9 @@ router.get('/my-submissions', auth, async (req, res) => {
 router.get('/my-quiz-results', auth, async (req, res) => {
     try {
         const { QuizResult } = await getLMSModels(req);
-        const results = await QuizResult.find({ studentId: req.user.id });
+        const resolvedStudentId = await resolveTenantUserId(req, req.user.id);
+        const studentIds = [...new Set([String(req.user.id), String(resolvedStudentId)])];
+        const results = await QuizResult.find({ studentId: { $in: studentIds } });
         res.json(results);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -660,5 +671,4 @@ router.delete('/courses/:id/enroll/:studentId', auth, async (req, res) => {
 });
 
 module.exports = router;
-
 

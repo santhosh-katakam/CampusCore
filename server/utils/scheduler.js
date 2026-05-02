@@ -61,21 +61,33 @@ class Scheduler {
         return array;
     }
 
-    // Resolve faculty for a subject config, preferring per-batch map over flat array
     resolveFaculty(conf, mode) {
         const currentBatchId = this.batch ? (this.batch._id ? this.batch._id.toString() : this.batch.batchId) : null;
+        
+        let faculty = '';
         if (mode === 'Lab') {
             if (conf.labFacultyMap && currentBatchId && conf.labFacultyMap[currentBatchId] && conf.labFacultyMap[currentBatchId].length > 0) {
-                return conf.labFacultyMap[currentBatchId].join(', ');
+                faculty = conf.labFacultyMap[currentBatchId].join(', ');
+            } else if (Array.isArray(conf.labFaculty) && conf.labFaculty.length > 0) {
+                faculty = conf.labFaculty.join(', ');
+            } else if (conf.lectureFacultyMap && currentBatchId && conf.lectureFacultyMap[currentBatchId] && conf.lectureFacultyMap[currentBatchId].length > 0) {
+                faculty = conf.lectureFacultyMap[currentBatchId].join(', ');
+            } else if (Array.isArray(conf.lectureFaculty) && conf.lectureFaculty.length > 0) {
+                faculty = conf.lectureFaculty.join(', ');
             }
-            if (Array.isArray(conf.labFaculty) && conf.labFaculty.length > 0) return conf.labFaculty.join(', ');
         } else {
             if (conf.lectureFacultyMap && currentBatchId && conf.lectureFacultyMap[currentBatchId] && conf.lectureFacultyMap[currentBatchId].length > 0) {
-                return conf.lectureFacultyMap[currentBatchId].join(', ');
+                faculty = conf.lectureFacultyMap[currentBatchId].join(', ');
+            } else if (Array.isArray(conf.lectureFaculty) && conf.lectureFaculty.length > 0) {
+                faculty = conf.lectureFaculty.join(', ');
+            } else if (conf.labFacultyMap && currentBatchId && conf.labFacultyMap[currentBatchId] && conf.labFacultyMap[currentBatchId].length > 0) {
+                faculty = conf.labFacultyMap[currentBatchId].join(', ');
+            } else if (Array.isArray(conf.labFaculty) && conf.labFaculty.length > 0) {
+                faculty = conf.labFaculty.join(', ');
             }
-            if (Array.isArray(conf.lectureFaculty) && conf.lectureFaculty.length > 0) return conf.lectureFaculty.join(', ');
         }
-        return conf.faculty || '';
+        
+        return faculty || conf.faculty || '';
     }
 
     // --- Initialization ---

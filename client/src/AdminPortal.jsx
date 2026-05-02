@@ -490,11 +490,12 @@ function AdminPortal({ role }) {
             const electiveSet = new Set(electives.map(s => (s || "").trim().toLowerCase()));
             const trainingSet = new Set(trainings.map(s => (s || "").trim().toLowerCase()));
 
-            Object.keys(subjectConfig).forEach(subName => {
+            const currentConfig = batchConfigsRef.current['COMMON']?.subjectConfig || subjectConfig;
+            Object.keys(currentConfig).forEach(subName => {
                 const isElective = electiveSet.has((subName || "").trim().toLowerCase());
                 const isTraining = trainingSet.has((subName || "").trim().toLowerCase());
                 processedSubjectConfig[subName] = {
-                    ...subjectConfig[subName],
+                    ...currentConfig[subName],
                     subjectType: isTraining ? 'Training' : (isElective ? 'Elective' : 'Core')
                 };
             });
@@ -505,7 +506,7 @@ function AdminPortal({ role }) {
                 batchId: primaryBatch._id,
                 batchIds: selectedBatches.length > 0 ? selectedBatches.map(b => b._id) : [primaryBatch._id],
                 batchNames: selectedBatches.length > 0 ? selectedBatches.map(b => b.name || b.batchId) : [primaryBatch.name || primaryBatch.batchId],
-                batchConfigs: selectedBatches.reduce((acc, b) => {
+                batchConfigs: (selectedBatches.length > 0 ? selectedBatches : [primaryBatch]).reduce((acc, b) => {
                     const conf = batchConfigsRef.current['COMMON']?.subjectConfig || {};
                     const procConf = {};
                     Object.keys(conf).forEach(subName => {
@@ -513,8 +514,22 @@ function AdminPortal({ role }) {
                         const type = (subjObj.type || subjObj.courseType || 'Core').toString().toLowerCase();
                         const isTraining = type.includes('training');
                         const isElective = type.includes('elective');
-                        const lecFac = conf[subName].lectureFacultyMap ? conf[subName].lectureFacultyMap[b._id] : conf[subName].lectureFaculty;
-                        const labFac = conf[subName].labFacultyMap ? conf[subName].labFacultyMap[b._id] : conf[subName].labFaculty;
+                        
+                        // Better logic: Check if maps exist and have actual data
+                        let lecFac = [];
+                        if (conf[subName].lectureFacultyMap && Object.keys(conf[subName].lectureFacultyMap).length > 0) {
+                            lecFac = conf[subName].lectureFacultyMap[b._id] || [];
+                        } else if (conf[subName].lectureFaculty && Array.isArray(conf[subName].lectureFaculty)) {
+                            lecFac = conf[subName].lectureFaculty;
+                        }
+                        
+                        let labFac = [];
+                        if (conf[subName].labFacultyMap && Object.keys(conf[subName].labFacultyMap).length > 0) {
+                            labFac = conf[subName].labFacultyMap[b._id] || [];
+                        } else if (conf[subName].labFaculty && Array.isArray(conf[subName].labFaculty)) {
+                            labFac = conf[subName].labFaculty;
+                        }
+                        
                         procConf[subName] = {
                             ...conf[subName],
                             subjectType: isTraining ? 'Training' : (isElective ? 'Elective' : 'Core'),
@@ -525,14 +540,14 @@ function AdminPortal({ role }) {
                     acc[b._id] = procConf;
                     return acc;
                 }, {}),
-                batchRooms: selectedBatches.reduce((acc, b) => {
+                batchRooms: (selectedBatches.length > 0 ? selectedBatches : [primaryBatch]).reduce((acc, b) => {
                     acc[b._id] = {
                         lectureRooms: selectedLectureRooms,
                         labRooms: selectedLabRooms
                     };
                     return acc;
                 }, {}),
-                batchLunchConfigs: selectedBatches.reduce((acc, b) => {
+                batchLunchConfigs: (selectedBatches.length > 0 ? selectedBatches : [primaryBatch]).reduce((acc, b) => {
                     const lunchConfigs = batchConfigsRef.current['COMMON']?.lunchConfigs || {};
                     acc[b._id] = lunchConfigs[b._id] || null;
                     return acc;
@@ -697,8 +712,16 @@ function AdminPortal({ role }) {
 
         // Initialize config from existing timetable
         const initialConfig = {};
+        const oldConfig = (tt.config && tt.config.batchConfigs && tt.config.batchConfigs[batch._id]) 
+                            || (tt.config && tt.config.subjectConfig) 
+                            || {};
+
         batch.subjects.forEach(sub => {
-            initialConfig[sub] = { lectureHours: 3, labHours: 0, lectureFaculty: [], labFaculty: [], labRoom: "" };
+            if (oldConfig[sub]) {
+                initialConfig[sub] = oldConfig[sub];
+            } else {
+                initialConfig[sub] = { lectureHours: 3, labHours: 0, lectureFaculty: [], labFaculty: [], labRoom: "" };
+            }
         });
         setSubjectConfig(initialConfig);
 
@@ -1079,10 +1102,15 @@ function AdminPortal({ role }) {
             );
         }
 
+        // Debug logging
+        if (periodData?.subject) {
+            console.log(`[Period] ${periodData.subject}:`, { faculty: periodData.faculty, room: periodData.room, type: periodData.type, fullData: periodData });
+        }
+        
         return (
             <div className="text-gray-800 space-y-0.5 font-medium">
-                <div>Faculty: {periodData.faculty}</div>
-                <div>Room: {periodData.room}</div>
+                <div>Faculty: {periodData.faculty || '(not set)'}</div>
+                <div>Room: {periodData.room || '(not set)'}</div>
                 {periodData.batches && periodData.batches.length > 0 && (
                     <div className="text-[10px] text-indigo-600 bg-indigo-50 rounded px-1 mt-0.5 border border-indigo-100">
                         Batches: {periodData.batches.join(', ')}

@@ -130,7 +130,7 @@ function App() {
   const timetableTabs = [
     { id: 'company', label: '🏢 Institutions', component: CompanyPortal, roles: ['COMPANY_ADMIN'], section: 'timetable' },
     { id: 'admin', label: '👨‍💼 Admin Dashboard', component: AdminPortal, roles: ['hod'], section: 'timetable' },
-    { id: 'upload', label: '📊 Data Upload', component: ExcelUpload, roles: ['hod', 'faculty'], section: 'timetable' },
+    { id: 'upload', label: '📊 Data Upload', component: ExcelUpload, roles: ['hod'], section: 'timetable' },
     { id: 'config', label: '⚙️ Config', component: TimetableConfig, roles: ['hod'], section: 'timetable' },
     { id: 'faculty-list', label: '🧑‍🏫 Faculty', component: FacultyAvailability, roles: ['hod'], section: 'timetable' },
     { id: 'elective', label: '🧩 Electives', component: ElectiveGrouping, roles: ['hod'], section: 'timetable' },
@@ -173,6 +173,9 @@ function App() {
 
   const currentTabId = getSafeActiveTab();
   const ActiveComponent = [...timetableTabs, ...lmsTabs, ...attendanceTabs, ...jobTabs].find(tab => tab.id === currentTabId)?.component || (() => <div style={{ padding: 40 }}>Unauthorized or No Section Selected</div>);
+  const roleDisplayLabel = (user.role === 'HOD' || user.role === 'COLLEGE_ADMIN')
+    ? 'Main Administration Portal'
+    : user.role.replace('_', ' ');
 
   return (
     <ErrorBoundary>
@@ -258,7 +261,7 @@ function App() {
                       }}
                       style={{ background: 'transparent', color: 'white', border: 'none', fontWeight: 'bold', outline: 'none', cursor: 'pointer' }}
                     >
-                      <option value="hod" style={{ color: '#333' }}>Super Admin (HOD)</option>
+                      <option value="hod" style={{ color: '#333' }}>Main Administration Portal</option>
                       <option value="faculty" style={{ color: '#333' }}>Faculty</option>
                       <option value="student" style={{ color: '#333' }}>Student</option>
                     </select>
@@ -273,7 +276,7 @@ function App() {
 
                 <div style={{ textAlign: 'right', borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: '15px' }}>
                   <div style={{ fontSize: '14px', fontWeight: '800' }}>{user.name || user.username}</div>
-                  <div style={{ fontSize: '11px', opacity: 0.7, textTransform: 'uppercase' }}>{user.role.replace('_', ' ')}</div>
+                  <div style={{ fontSize: '11px', opacity: 0.7, textTransform: roleDisplayLabel === 'Main Administration Portal' ? 'none' : 'uppercase' }}>{roleDisplayLabel}</div>
                 </div>
                 <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', width: '36px', height: '36px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Logout">
                   🚪

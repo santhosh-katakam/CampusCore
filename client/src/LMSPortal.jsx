@@ -22,6 +22,19 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
     const [studentStats, setStudentStats] = useState([]); // For course-specific student progress
     const [activeQuizId, setActiveQuizId] = useState(null);
 
+    const normalizeId = (value) => {
+        if (!value) return '';
+        if (typeof value === 'object' && value._id) return String(value._id);
+        return String(value);
+    };
+
+    const getMyQuizResult = (quizId) => {
+        const qid = normalizeId(quizId);
+        return myQuizResults.find((r) => normalizeId(r.quizId) === qid);
+    };
+
+    const hasCompletedQuiz = (quizId) => !!getMyQuizResult(quizId);
+
 
     useEffect(() => {
         if (setIsQuizMode) {
@@ -36,6 +49,10 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
 
 
     const startQuiz = (quiz) => {
+        if (viewingAs === 'student' && hasCompletedQuiz(quiz._id)) {
+            alert('You have already completed this quiz. Retake is not allowed.');
+            return;
+        }
         setQuizPlay({
             ...quiz,
             currentQuestion: 0,
@@ -74,8 +91,9 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
             alert(`Quiz submitted! Your score: ${score} / ${totalMarks}`);
             setQuizPlay(null);
             fetchCourses(); // Refresh to show results if needed
+            fetchMyQuizResults();
         } catch (err) {
-            alert('Failed to submit quiz: ' + err.message);
+            alert('Failed to submit quiz: ' + (err.response?.data?.message || err.message));
         }
     };
 
@@ -1212,21 +1230,25 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                                                     </button>
                                                                 </>
                                                             )}
-                                                            <button 
+                                                            <button
                                                                 onClick={() => startQuiz(quiz)}
+                                                                disabled={viewingAs === 'student' && hasCompletedQuiz(quiz._id)}
                                                                 style={{ 
-                                                                    background: viewingAs === 'student' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#f6ad55', 
+                                                                    background: viewingAs === 'student'
+                                                                        ? (hasCompletedQuiz(quiz._id) ? '#94a3b8' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)')
+                                                                        : '#f6ad55',
                                                                     color: 'white', 
                                                                     border: 'none', 
                                                                     padding: '10px 25px', 
                                                                     borderRadius: '8px', 
                                                                     fontSize: '14px', 
                                                                     fontWeight: 'bold', 
-                                                                    cursor: 'pointer',
+                                                                    cursor: (viewingAs === 'student' && hasCompletedQuiz(quiz._id)) ? 'not-allowed' : 'pointer',
+                                                                    opacity: (viewingAs === 'student' && hasCompletedQuiz(quiz._id)) ? 0.9 : 1,
                                                                     boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
                                                                 }}
                                                             >
-                                                                {viewingAs === 'student' ? (myQuizResults.find(r => r.quizId === quiz._id) ? 'Retake Quiz' : 'Take Quiz') : 'Preview Quiz'}
+                                                                {viewingAs === 'student' ? (hasCompletedQuiz(quiz._id) ? 'Completed' : 'Take Quiz') : 'Preview Quiz'}
                                                             </button>
                                                             {(viewingAs === 'hod' || viewingAs === 'faculty') && (
                                                                 <button 
@@ -1238,10 +1260,10 @@ const LMSPortal = ({ user, viewingAs, setIsQuizMode }) => {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    {viewingAs === 'student' && myQuizResults.find(r => r.quizId === quiz._id) && (
+                                                    {viewingAs === 'student' && getMyQuizResult(quiz._id) && (
                                                         <div style={{ marginTop: '-10px', marginBottom: '20px', padding: '15px', background: '#f0fdf4', borderRadius: '0 0 16px 16px', border: '1px solid #dcfce7', borderTop: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <span style={{ fontSize: '14px', color: '#166534', fontWeight: 'bold' }}>Last Score: {myQuizResults.find(r => r.quizId === quiz._id).score} / {myQuizResults.find(r => r.quizId === quiz._id).totalMarks}</span>
-                                                            <span style={{ fontSize: '12px', color: '#166534' }}>Completed: {new Date(myQuizResults.find(r => r.quizId === quiz._id).completedAt).toLocaleString()}</span>
+                                                            <span style={{ fontSize: '14px', color: '#166534', fontWeight: 'bold' }}>Last Score: {getMyQuizResult(quiz._id).score} / {getMyQuizResult(quiz._id).totalMarks}</span>
+                                                            <span style={{ fontSize: '12px', color: '#166534' }}>Completed: {new Date(getMyQuizResult(quiz._id).completedAt).toLocaleString()}</span>
                                                         </div>
                                                     )}
                                                 </React.Fragment>
